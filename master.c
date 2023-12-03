@@ -1,17 +1,35 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
-
-void met();
+#include <fcntl.h>
+#include "StringUtils.h"
 
 int main() {
     printf("Hello, World 4!\n");
-    met();
-    sleep(3);
-    #define TEST 5
+    char* newString = string("prova");
+    printf("%i", stringEndsWith(newString, ""));
     return 0;
 }
 
-void met()
+void readConfig()
 {
-    printf("Provetta %i", TEST);
+    FILE* file = fopen("./config.txt", "r");
+    if (file != NULL)
+    {
+    /*    char* line = malloc(sizeof(char[100]));
+        do
+        {
+            fgets(line, 100, file);
+        }
+        while
+        fclose(file);*/
+    }
+}
+
+char* readLine(FILE* file)
+{
+    if (file != NULL)
+    {
+
+    }
 }
