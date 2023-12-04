@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <fcntl.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 #include "StringUtils.h"
+#include "MessageUtils.h"
 
 int ENERGY_DEMAND = -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
@@ -27,6 +29,11 @@ int main() {
     printf("MIN_N_ATOMICO = %i\n", MIN_N_ATOMICO);
     printf("STEP = %i\n", STEP);
     printf("SIM_DURATION = %i\n", SIM_DURATION);
+
+    key_t key = 10002;
+    int msgId = msgget(key, IPC_CREAT | 0644);
+    Message message = createMessage(1, "questo è un bel messaggio");
+    msgsnd(msgId, &message, sizeof(message), 0);
     return 0;
 }
 
