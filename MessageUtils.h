@@ -11,4 +11,6 @@ Message createMessage(long type, const char* string);
 
 Message createEmptyMessage();
 
+void sendMessage(pid_t targetPid, Message message);
+
 #endif //DISALVOFRANZA_PROGETTOSO_MESSAGEUTILS_H

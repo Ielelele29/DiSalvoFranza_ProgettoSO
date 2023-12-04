@@ -2,6 +2,9 @@
 // Created by lelelele29 on 04/12/23.
 //
 
+#include <unistd.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 #include "MessageUtils.h"
 #include "CustomTypes.h"
 
@@ -29,4 +32,11 @@ Message createEmptyMessage()
         i++;
     }
     return message;
+}
+
+void sendMessage(pid_t targetPid, Message message)
+{
+    key_t key = targetPid;
+    int msgId = msgget(key, IPC_CREAT | 0644);
+    msgsnd(msgId, &message, sizeof(message), 0);
 }

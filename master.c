@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <time.h>
 #include "StringUtils.h"
 #include "MessageUtils.h"
 
@@ -15,11 +16,13 @@ int MIN_N_ATOMICO = -1;
 int STEP = -1;
 int SIM_DURATION = -1;
 
+pid_t supplyPid = -1;
+pid_t activatorPid = -1;
+
 void readConfig();
 
 int main() {
     printf("Hello, World 4!\n");
-    printf("key = %s\nvalue = %s\n", stringBefore("string=25", "="), stringAfter("string=25", "="));
     readConfig();
     printf("ENERGY_DEMAND = %i\n", ENERGY_DEMAND);
     printf("ENERGY_EXPLODE_THRESHOLD = %i\n", ENERGY_EXPLODE_THRESHOLD);
@@ -30,12 +33,60 @@ int main() {
     printf("STEP = %i\n", STEP);
     printf("SIM_DURATION = %i\n", SIM_DURATION);
 
-    key_t key = 10002;
+/*    key_t key = 10002;
     int msgId = msgget(key, IPC_CREAT | 0644);
     Message message = createMessage(1, "questo è un bel messaggio");
-    msgsnd(msgId, &message, sizeof(message), 0);
+    msgsnd(msgId, &message, sizeof(message), 0);*/
+
+    pid_t pid = fork();
+    printf("Creazione processo Alimentazione...\n");
+    if (pid < 0)
+    {
+        printf("Errore durante la creazione del processo Alimentazione\n");
+        return 0;
+    }
+    else if (pid == 0)
+    {
+        char* forkArgs[] = {NULL};
+        char* forkEnv[] = {NULL};
+        printf("Processo Alimentazione creato correttamente\n");
+        execve("./Supply", forkArgs, forkEnv);
+        printf("Errore Processo Alimentazione\n");
+    }
+ //   printf("Questo è il processo padre che continua. PID figlio = %i\n", pid);
+    supplyPid = pid;
+
+    pid = fork();
+    printf("Creazione processo Attivatore...\n");
+    if (pid < 0)
+    {
+        printf("Errore durante la creazione del processo Attivatore\n");
+        return 0;
+    }
+    else if (pid == 0)
+    {
+        char* forkArgs[] = {NULL};
+        char* forkEnv[] = {NULL};
+        printf("Processo Attivatore creato correttamente\n");
+        execve("./Activator", forkArgs, forkEnv);
+        printf("Errore Processo Attivatore\n");
+    }
+    activatorPid = pid;
+
+    while (SIM_DURATION > 0)
+    {
+        struct timespec timeToSleep;
+        timeToSleep.tv_sec = 0;
+        timeToSleep.tv_nsec = STEP;
+        nanosleep(&timeToSleep, NULL);
+        SIM_DURATION--;
+        sendMessage(supplyPid, createMessage(1, "tick"));
+        sendMessage(activatorPid, createMessage(1, "tick"));
+    }
     return 0;
 }
+
+
 
 
 void readLine(char* line)
@@ -84,8 +135,6 @@ void readLine(char* line)
     {
         SIM_DURATION = atoi(value);
     }
-
-
 }
 
 void readConfig()
