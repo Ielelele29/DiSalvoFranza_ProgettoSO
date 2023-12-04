@@ -11,9 +11,17 @@ char* string(char* string);
 
 char* emptyString(int length);
 
+char* stringClearChar(char* string, char c);
+
+boolean stringEquals(char* string1, char* string2);
+
 boolean stringStartsWith(char* string, char* start);
 
 boolean stringEndsWith(char* input, char* end);
+
+char* stringAfter(char* string, char* startReading);
+
+char* stringBefore(char* input, char* endReading);
 
 
 

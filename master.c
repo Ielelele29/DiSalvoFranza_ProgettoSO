@@ -6,9 +6,25 @@
 
 int main() {
     printf("Hello, World 4!\n");
-    char* newString = string("prova");
-    printf("%i", stringEndsWith(newString, ""));
+    printf("key = %s\nvalue = %s", stringBefore("string=25", "="), stringAfter("string=25", "="));
     return 0;
+}
+
+
+void readLine(char* line)
+{
+    line = stringClearChar(line, ' ');
+    if (stringEndsWith(line, "\0"))
+    {
+        line = stringCut(line, 0, stringLength(line) - 2);
+    }
+    if (stringEndsWith(line, "\n"))
+    {
+        line = stringCut(line, 0, stringLength(line) - 1);
+    }
+    char* key = stringBefore(line, "=");
+    char* value = stringAfter(line, "=");
+
 }
 
 void readConfig()
@@ -16,20 +32,15 @@ void readConfig()
     FILE* file = fopen("./config.txt", "r");
     if (file != NULL)
     {
-    /*    char* line = malloc(sizeof(char[100]));
+        boolean hasNextLine;
+        char* line = emptyString(100);
         do
         {
             fgets(line, 100, file);
+            readLine(line);
+            hasNextLine = !stringEndsWith(line, "\0");
         }
-        while
-        fclose(file);*/
-    }
-}
-
-char* readLine(FILE* file)
-{
-    if (file != NULL)
-    {
-
+        while (hasNextLine);
+        fclose(file);
     }
 }
