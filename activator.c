@@ -30,20 +30,19 @@ int main() {
     while(true)
     {
         msgrcv(msgId, &message, sizeof(message), 1, 0);
-        if (stringEquals(message.messageText, "tick") == 1)
+        if (stringEquals(message.messageText, "tick"))
         {
             tick();
         }
-        else if (stringEquals(message.messageText, "term") == 1)
+        else if (stringEquals(message.messageText, "term"))
         {
             break;
         }
         else
         {
-            printf("Error = %s\n", strerror(errno));
+            printf("Error invalid message!\n");
             break;
         }
-
     }
 
 

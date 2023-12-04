@@ -12,6 +12,7 @@
 #include "MessageUtils.h"
 
 void tick();
+int N_NUOVI_ATOMI = -1;
 
 int main() {
 
@@ -20,25 +21,42 @@ int main() {
     Message message = createEmptyMessage();
     while(true)
     {
-        msgrcv(msgId, &message, sizeof(message), 1, 0);
-        if (stringEquals(message.messageText, "tick") == 1)
+        msgrcv(msgId, &message, sizeof(message), 0, 0);
+        if(message.messageType == 1)
         {
-            tick();
+            if (stringEquals(message.messageText, "tick"))
+            {
+                tick();
+            }
+            else if (stringEquals(message.messageText, "term"))
+            {
+                break;
+            }
+            else
+            {
+                printf("Error invalid message!\n");
+                break;
+            }
         }
-        else if (stringEquals(message.messageText, "term") == 1)
+        else if (message.messageType == 2)
         {
-            break;
+            // message N_NUOVI_ATOMI
+            if(stringStartsWith(message.messageText,"N_NUOVI_ATOMI="))
+            {
+                N_NUOVI_ATOMI = atoi(stringAfter(message.messageText,"N_NUOVI_ATOMI="));
+            }
+            else
+            {
+                printf("Error invalid message!\n");
+                break;
+            }
         }
         else
         {
-            printf("Error = %s\n", strerror(errno));
+            printf("Error invalid message!\n");
             break;
         }
-
     }
-
-
-
 
     return 0;
 }
