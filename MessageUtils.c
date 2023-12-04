@@ -24,7 +24,7 @@ Message createMessage(long type, const char* string)
 Message createEmptyMessage()
 {
     Message message;
-    message.messageType = 1;
+    message.messageType = -1;
     int i = 0;
     while (i < 100)
     {
