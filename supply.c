@@ -44,12 +44,8 @@ int main() {
 }
 
 void tick(){
+    printf("Supply tick\n");
 
     printf("Ogni STEP nanosecondi\n");
 
-    while(/* TODO finchè attivato */)
-    {
-        sleep(STEP/1000000000);
-        // TODO  immissione nuovo combustibile
-    }
 }

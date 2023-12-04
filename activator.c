@@ -52,5 +52,6 @@ int main() {
 
 
 void tick(){
+    printf("Activator tick\n");
     // TODO comunicazione scissione atomi
 }

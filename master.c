@@ -38,8 +38,8 @@ int main() {
     Message message = createMessage(1, "questo è un bel messaggio");
     msgsnd(msgId, &message, sizeof(message), 0);*/
 
-    pid_t pid = fork();
     printf("Creazione processo Alimentazione...\n");
+    pid_t pid = fork();
     if (pid < 0)
     {
         printf("Errore durante la creazione del processo Alimentazione\n");
@@ -52,12 +52,13 @@ int main() {
         printf("Processo Alimentazione creato correttamente\n");
         execve("./Supply", forkArgs, forkEnv);
         printf("Errore Processo Alimentazione\n");
+        return 0;
     }
+
  //   printf("Questo è il processo padre che continua. PID figlio = %i\n", pid);
     supplyPid = pid;
-
-    pid = fork();
     printf("Creazione processo Attivatore...\n");
+    pid = fork();
     if (pid < 0)
     {
         printf("Errore durante la creazione del processo Attivatore\n");
@@ -70,14 +71,15 @@ int main() {
         printf("Processo Attivatore creato correttamente\n");
         execve("./Activator", forkArgs, forkEnv);
         printf("Errore Processo Attivatore\n");
+        return 0;
     }
     activatorPid = pid;
 
     while (SIM_DURATION > 0)
     {
         struct timespec timeToSleep;
-        timeToSleep.tv_sec = 0;
-        timeToSleep.tv_nsec = STEP;
+        timeToSleep.tv_sec = STEP/1000000000;
+        timeToSleep.tv_nsec = STEP%1000000000;
         nanosleep(&timeToSleep, NULL);
         SIM_DURATION--;
         sendMessage(supplyPid, createMessage(1, "tick"));
@@ -94,7 +96,7 @@ void readLine(char* line)
     line = stringClearChar(line, ' ');
     if (stringEndsWith(line, "\0"))
     {
-        line = stringCut(line, 0, stringLength(line) - 2);
+        line = stringCut(line, 0, stringLength(line) - 1);
     }
     if (stringEndsWith(line, "\n"))
     {
