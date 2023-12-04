@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <sys/sem.h>
 #include <time.h>
 #include "StringUtils.h"
 #include "MessageUtils.h"
@@ -33,10 +34,6 @@ int main() {
     printf("STEP = %i\n", STEP);
     printf("SIM_DURATION = %i\n", SIM_DURATION);
 
-/*    key_t key = 10002;
-    int msgId = msgget(key, IPC_CREAT | 0644);
-    Message message = createMessage(1, "questo è un bel messaggio");
-    msgsnd(msgId, &message, sizeof(message), 0);*/
 
     printf("Creazione processo Alimentazione...\n");
     pid_t pid = fork();
@@ -54,9 +51,10 @@ int main() {
         printf("Errore Processo Alimentazione\n");
         return 0;
     }
-
- //   printf("Questo è il processo padre che continua. PID figlio = %i\n", pid);
     supplyPid = pid;
+    sendMessage(supplyPid, createMessage(2, stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI))));
+    printf("riga = %s\n", stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI)));
+
     printf("Creazione processo Attivatore...\n");
     pid = fork();
     if (pid < 0)
@@ -75,16 +73,21 @@ int main() {
     }
     activatorPid = pid;
 
+
     while (SIM_DURATION > 0)
     {
+        sendMessage(supplyPid, createMessage(1, "tick"));
+        sendMessage(activatorPid, createMessage(1, "tick"));
         struct timespec timeToSleep;
         timeToSleep.tv_sec = STEP/1000000000;
         timeToSleep.tv_nsec = STEP%1000000000;
         nanosleep(&timeToSleep, NULL);
         SIM_DURATION--;
-        sendMessage(supplyPid, createMessage(1, "tick"));
-        sendMessage(activatorPid, createMessage(1, "tick"));
     }
+    sendMessage(supplyPid, createMessage(1, "term"));
+    killMessageChannel(supplyPid);
+    sendMessage(activatorPid, createMessage(1, "term"));
+    killMessageChannel(activatorPid);
     return 0;
 }
 

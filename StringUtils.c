@@ -1,5 +1,6 @@
 #include "StringUtils.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 
 int stringLength(char* string)
@@ -154,4 +155,31 @@ char* stringBefore(char* input, char* endReading)
         i++;
     }
     return newString;
+}
+
+char* intToString(int num)
+{
+    char* numString = emptyString(11);
+    snprintf(numString, sizeof(numString), "%i", num);
+    return numString;
+}
+
+char* stringJoin(char* string1, char* string2)
+{
+    int length1 = stringLength(string1);
+    int length2 = stringLength(string2);
+    int totalLength = length1 + length2;
+    char* totalString = emptyString(totalLength);
+    int i = 0;
+    while (i < length1)
+    {
+        totalString[i] = string1[i];
+        i++;
+    }
+    while (i < totalLength)
+    {
+        totalString[i] = string2[i - length1];
+        i++;
+    }
+    return totalString;
 }

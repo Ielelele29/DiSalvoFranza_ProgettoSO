@@ -62,7 +62,7 @@ int main() {
 }
 
 void tick(){
-    printf("Supply tick\n");
+    printf("Supply tick ATOMI = %i\n", N_NUOVI_ATOMI);
 
     printf("Ogni STEP nanosecondi\n");
 

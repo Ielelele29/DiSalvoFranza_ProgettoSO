@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
 #include "MessageUtils.h"
 #include "CustomTypes.h"
 
@@ -39,4 +42,11 @@ void sendMessage(pid_t targetPid, Message message)
     key_t key = targetPid;
     int msgId = msgget(key, IPC_CREAT | 0644);
     msgsnd(msgId, &message, sizeof(message), 0);
+}
+
+void killMessageChannel(pid_t targetPid)
+{
+    key_t key = targetPid;
+    int msgId = msgget(key, IPC_CREAT);
+    msgctl(msgId, IPC_RMID, NULL);
 }

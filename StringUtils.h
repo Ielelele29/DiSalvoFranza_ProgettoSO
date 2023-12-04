@@ -23,6 +23,10 @@ char* stringAfter(char* string, char* startReading);
 
 char* stringBefore(char* input, char* endReading);
 
+char* intToString(int num);
+
+char* stringJoin(char* string1, char* string2);
+
 
 
 #endif //DISALVOFRANZA_PROGETTOSO_STRINGUTILS_H
