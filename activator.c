@@ -24,24 +24,31 @@ int main() {
     printf("Messaggio con id %li arrivato = %s", message.messageType, message.messageText);
 #endif
 
+
     key_t key = getpid();
     int msgId = msgget(key, IPC_CREAT | 0644);
     Message message = createEmptyMessage();
     while(true)
     {
-        msgrcv(msgId, &message, sizeof(message), 1, 0);
-        if (stringEquals(message.messageText, "tick"))
+        if(msgrcv(msgId, &message, sizeof(message), 1, 0) > 0)
         {
-            tick();
-        }
-        else if (stringEquals(message.messageText, "term"))
-        {
-            break;
+            if (stringEquals(message.messageText, "tick"))
+            {
+                tick();
+            }
+            else if (stringEquals(message.messageText, "term"))
+            {
+                break;
+            }
+            else
+            {
+                printf("Error invalid message!\n");
+                break;
+            }
         }
         else
         {
-            printf("Error invalid message!\n");
-            break;
+            printf("Error receiving message!\n");
         }
     }
 

@@ -12,7 +12,10 @@
 #include "MessageUtils.h"
 
 void tick();
+void createAtoms();
+void waitNano();
 int N_NUOVI_ATOMI = -1;
+int STEP = -1;
 
 int main() {
 
@@ -21,40 +24,37 @@ int main() {
     Message message = createEmptyMessage();
     while(true)
     {
-        msgrcv(msgId, &message, sizeof(message), 0, 0);
-        if(message.messageType == 1)
+        if(msgrcv(msgId, &message, sizeof(message), 0, 0) != -1)
         {
-            if (stringEquals(message.messageText, "tick"))
+            if (message.messageType == 2)
             {
-                tick();
-            }
-            else if (stringEquals(message.messageText, "term"))
-            {
-                break;
+                if(stringStartsWith(message.messageText,"N_NUOVI_ATOMI="))
+                {
+                    N_NUOVI_ATOMI = atoi(stringAfter(message.messageText,"N_NUOVI_ATOMI="));
+                }
+                else if(stringStartsWith(message.messageText,"STEP="))
+                {
+                    STEP = atoi(stringAfter(message.messageText,"STEP="));
+                    tick();
+                    break;
+                }
+                else
+                {
+                    printf("Error invalid message!\n");
+                    printf("Waiting for a new message...\n");
+
+                }
             }
             else
             {
                 printf("Error invalid message!\n");
-                break;
-            }
-        }
-        else if (message.messageType == 2)
-        {
-            // message N_NUOVI_ATOMI
-            if(stringStartsWith(message.messageText,"N_NUOVI_ATOMI="))
-            {
-                N_NUOVI_ATOMI = atoi(stringAfter(message.messageText,"N_NUOVI_ATOMI="));
-            }
-            else
-            {
-                printf("Error invalid message!\n");
-                break;
+                printf("Waiting for a new message...\n");
             }
         }
         else
         {
-            printf("Error invalid message!\n");
-            break;
+            printf("Error receiving message!\n");
+            printf("Waiting for a new message...\n");
         }
     }
 
@@ -62,8 +62,43 @@ int main() {
 }
 
 void tick(){
-    printf("Supply tick ATOMI = %i\n", N_NUOVI_ATOMI);
 
-    printf("Ogni STEP nanosecondi\n");
+    key_t key = getpid();
+    int msgId = msgget(key, IPC_CREAT | 0644);
+    Message message = createEmptyMessage();
 
+    while(true)
+    {
+        if(msgrcv(msgId, &message, sizeof(message), 1, IPC_NOWAIT) == -1)
+        {
+            waitNano();
+            createAtoms();
+        }
+        else {
+            if (stringEquals(message.messageText, "term"))
+            {
+                printf("Power termination!\n");
+                break;
+            }
+            else
+            {
+                waitNano();
+                createAtoms();
+            }
+
+        }
+    }
+}
+
+void waitNano()
+{
+    struct timespec timeToSleep;
+    timeToSleep.tv_sec = STEP/1000000000;
+    timeToSleep.tv_nsec = STEP%1000000000;
+    nanosleep(&timeToSleep, NULL);
+}
+
+void createAtoms()
+{
+    printf("Crea N_NUOVI_ATOMI %d\n",N_NUOVI_ATOMI);
 }
