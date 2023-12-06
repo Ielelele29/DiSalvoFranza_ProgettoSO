@@ -34,3 +34,8 @@ void deleteSharedMemory(int sharedMemoryId)
         printf("Delete shared memory error");
     }
 }
+
+void expandSharedMemory(int sharedMemoryId, int newSize)
+{
+
+}

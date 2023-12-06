@@ -160,7 +160,7 @@ char* stringBefore(char* input, char* endReading)
 char* intToString(int num)
 {
     char* numString = emptyString(11);
-    snprintf(numString, sizeof(numString), "%i", num);
+    sprintf(numString, "%d", num);
     return numString;
 }
 
