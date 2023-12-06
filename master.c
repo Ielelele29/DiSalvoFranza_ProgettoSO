@@ -10,10 +10,12 @@ int ENERGY_DEMAND = -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
 int N_NUOVI_ATOMI = -1;
 int N_ATOMI_INIT = -1;
-int N_ATOMI_MAX = -1;
+int N_ATOM_MAX = -1;
 int MIN_N_ATOMICO = -1;
 int STEP = -1;
 int SIM_DURATION = -1;
+
+#define MAX_ATOMS 100
 
 pid_t supplyPid = -1;
 pid_t activatorPid = -1;
@@ -28,7 +30,7 @@ int main() {
     printf("ENERGY_EXPLODE_THRESHOLD = %i\n", ENERGY_EXPLODE_THRESHOLD);
     printf("N_NUOVI_ATOMI = %i\n", N_NUOVI_ATOMI);
     printf("N_ATOMI_INIT = %i\n", N_ATOMI_INIT);
-    printf("N_ATOMI_MAX = %i\n", N_ATOMI_MAX);
+    printf("N_ATOM_MAX = %i\n", N_ATOM_MAX);
     printf("MIN_N_ATOMICO = %i\n", MIN_N_ATOMICO);
     printf("STEP = %i\n", STEP);
     printf("SIM_DURATION = %i\n", SIM_DURATION);
@@ -72,9 +74,10 @@ int main() {
     }
     activatorPid = pid;
 
-    int atomMemoryId = createAtomMemory(N_ATOMI_MAX);
+    int atomMemoryId = createAtomMemory(MAX_ATOMS);
     int* atomMemory = getAtomMemory(atomMemoryId);
     int atomSemaphoreId = getAtomSemaphore();
+    unlockSemaphore(atomSemaphoreId);
     for (int i = 0; i < N_ATOMI_INIT; i++)
     {
         printf("Creazione processo Atomo...\n");
@@ -87,7 +90,7 @@ int main() {
         }
         else if (atomPid == 0)
         {
-            int slot = getFirstFreeAtomSlot(atomMemoryId, N_ATOMI_MAX);
+            int slot = getFirstFreeAtomSlot(atomMemoryId, MAX_ATOMS);
             if (slot != -1 && sem != -1)
             {
                 atomMemory[slot] = atomPid;
@@ -117,6 +120,8 @@ int main() {
     killMessageChannel(supplyPid);
     sendMessage(activatorPid, createMessage(1, "term"));
     killMessageChannel(activatorPid);
+    deleteSemaphore(atomSemaphoreId);
+    deleteAtomMemory(atomMemoryId);
     return 0;
 }
 
@@ -158,9 +163,9 @@ void readLine(char* line)
     {
         N_ATOMI_INIT = atoi(value);
     }
-    else if (stringEquals(key, "N_ATOMI_MAX"))
+    else if (stringEquals(key, "N_ATOM_MAX"))
     {
-        N_ATOMI_MAX = atoi(value);
+        N_ATOM_MAX = atoi(value);
     }
     else if (stringEquals(key, "MIN_N_ATOMICO"))
     {
@@ -174,6 +179,8 @@ void readLine(char* line)
     {
         SIM_DURATION = atoi(value);
     }
+    free(key);
+    free(value);
 }
 
 void readConfig()
@@ -186,6 +193,7 @@ void readConfig()
         {
             readLine(line);
         }
+        free(line);
         fclose(file);
     }
 }

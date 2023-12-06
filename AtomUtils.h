@@ -7,6 +7,8 @@
 
 int createAtomMemory(int maxAtoms);
 
+void deleteAtomMemory(int atomMemoryId);
+
 int getAtomMemoryId(int maxAtoms);
 
 int* getAtomMemory(int atomMemoryId);

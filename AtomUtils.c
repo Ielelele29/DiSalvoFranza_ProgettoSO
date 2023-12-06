@@ -17,6 +17,11 @@ int createAtomMemory(int maxAtoms)
     return atomMemory;
 }
 
+void deleteAtomMemory(int atomMemoryId)
+{
+    deleteSharedMemory(atomMemoryId);
+}
+
 int getAtomMemoryId(int maxAtoms)
 {
     return getSharedMemoryId(10000, sizeof(int) * maxAtoms);
