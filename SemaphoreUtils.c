@@ -4,12 +4,11 @@
 
 #include "SemaphoreUtils.h"
 #include <stdio.h>
-#include <sys/types.h>
 #include <sys/sem.h>
 
-int getSemaphore(pid_t pid)
+int getSemaphore(int id)
 {
-    int semId = semget(pid, 1, IPC_CREAT | 0644);
+    int semId = semget(id, 1, IPC_CREAT | 0644);
     if (semId == -1)
     {
         printf("ERRORE");
@@ -29,13 +28,32 @@ void deleteSemaphore(int semId)
     }
 }
 
+int waitSemaphore(int semId)
+{
+    struct sembuf semOperation;
+    semOperation.sem_num = 0;
+    semOperation.sem_op = 0;
+    semOperation.sem_flg = 0;
+    int sem = semop(semId, &semOperation, 1);
+    if (sem == -1)
+    {
+        printf("Wait semaphore error");
+    }
+    return sem;
+}
+
 int waitAndLockSemaphore(int semId)
 {
     struct sembuf semOperation;
     semOperation.sem_num = 0;
     semOperation.sem_op = -1;
     semOperation.sem_flg = 0;
-    return semop(semId, &semOperation, 1);
+    int sem = semop(semId, &semOperation, 1);
+    if (sem == -1)
+    {
+        printf("Wait and lock semaphore error");
+    }
+    return sem;
 }
 
 int unlockSemaphore(int semId)
@@ -44,5 +62,10 @@ int unlockSemaphore(int semId)
     semOperation.sem_num = 0;
     semOperation.sem_op = 1;
     semOperation.sem_flg = 0;
-    return semop(semId, &semOperation, 1);
+    int sem = semop(semId, &semOperation, 1);
+    if (sem == -1)
+    {
+        printf("Unlock semaphore error");
+    }
+    return sem;
 }

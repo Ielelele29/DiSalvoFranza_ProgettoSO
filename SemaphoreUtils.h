@@ -5,15 +5,15 @@
 #ifndef DISALVOFRANZA_PROGETTOSO_SEMAPHOREUTILS_H
 #define DISALVOFRANZA_PROGETTOSO_SEMAPHOREUTILS_H
 
-#include <sys/types.h>
-
-int getSemaphore(pid_t pid);
+int getSemaphore(int id);
 
 void deleteSemaphore(int semId);
 
-int waitAndLockSemaphore(pid_t pid);
+int waitSemaphore(int semId);
 
-int unlockSemaphore(pid_t pid);
+int waitAndLockSemaphore(int semId);
+
+int unlockSemaphore(int semId);
 
 
 #endif //DISALVOFRANZA_PROGETTOSO_SEMAPHOREUTILS_H

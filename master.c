@@ -1,12 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <sys/sem.h>
-#include <time.h>
 #include "StringUtils.h"
 #include "MessageUtils.h"
+#include "SemaphoreUtils.h"
+#include "AtomUtils.h"
 
 int ENERGY_DEMAND = -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
@@ -21,6 +19,7 @@ pid_t supplyPid = -1;
 pid_t activatorPid = -1;
 
 void readConfig();
+void tick();
 
 int main() {
     printf("Hello, World 4!\n");
@@ -73,15 +72,45 @@ int main() {
     }
     activatorPid = pid;
 
+    int atomMemoryId = createAtomMemory(N_ATOMI_MAX);
+    int* atomMemory = getAtomMemory(atomMemoryId);
+    int atomSemaphoreId = getAtomSemaphore();
+    for (int i = 0; i < N_ATOMI_INIT; i++)
+    {
+        printf("Creazione processo Atomo...\n");
+        int sem = waitAndLockSemaphore(atomSemaphoreId);
+        pid_t atomPid = fork();
+        if (atomPid == -1)
+        {
+            printf("Errore durante la creazione del processo Atomo\n");
+            return 0;
+        }
+        else if (atomPid == 0)
+        {
+            int slot = getFirstFreeAtomSlot(atomMemoryId, N_ATOMI_MAX);
+            if (slot != -1 && sem != -1)
+            {
+                atomMemory[slot] = atomPid;
+                unlockSemaphore(atomSemaphoreId);
+                char* forkArgs[] = {NULL};
+                char* forkEnv[] = {NULL};
+                printf("Processo Atomo creato correttamente\n");
+                execve("./Atom", forkArgs, forkEnv);
+            }
+            else
+            {
+                //TODO TERMINAZIONE PER IMPOSSIBILITA' CREAZIONE ATOMO
+            }
+            printf("Errore Processo Atomo\n");
+            return 0;
+        }
+    }
 
+    sendMessage(supplyPid, createMessage(2, stringJoin("STEP=", intToString(STEP))));
     while (SIM_DURATION > 0)
     {
-        sendMessage(supplyPid, createMessage(1, "tick"));
-        sendMessage(activatorPid, createMessage(1, "tick"));
-        struct timespec timeToSleep;
-        timeToSleep.tv_sec = STEP/1000000000;
-        timeToSleep.tv_nsec = STEP%1000000000;
-        nanosleep(&timeToSleep, NULL);
+        tick();
+        sleep(1);
         SIM_DURATION--;
     }
     sendMessage(supplyPid, createMessage(1, "term"));
@@ -89,6 +118,11 @@ int main() {
     sendMessage(activatorPid, createMessage(1, "term"));
     killMessageChannel(activatorPid);
     return 0;
+}
+
+void tick()
+{
+    printf("Master Tick\n");
 }
 
 
