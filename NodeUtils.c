@@ -1,9 +1,4 @@
-//
-// Created by lelelele29 on 06/12/23.
-//
-
 #include <unistd.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include "NodeUtils.h"
 #include "CustomTypes.h"

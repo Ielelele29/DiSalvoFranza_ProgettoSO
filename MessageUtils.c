@@ -1,12 +1,6 @@
-//
-// Created by lelelele29 on 04/12/23.
-//
-
 #include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
-#include <errno.h>
-#include <stdio.h>
 #include <string.h>
 #include "MessageUtils.h"
 #include "CustomTypes.h"

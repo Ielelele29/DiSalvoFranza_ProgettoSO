@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 int stringLength(char* string)
 {
     int length = 0;

@@ -1,7 +1,3 @@
-//
-// Created by lelelele29 on 06/12/23.
-//
-
 #ifndef DISALVOFRANZA_PROGETTOSO_NODEUTILS_H
 #define DISALVOFRANZA_PROGETTOSO_NODEUTILS_H
 

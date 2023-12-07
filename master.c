@@ -7,7 +7,6 @@
 #include "MessageUtils.h"
 #include "SemaphoreUtils.h"
 #include "SignalUtils.h"
-#include "KeyUtils.h"
 #include "SharedMemoryUtils.h"
 
 int ENERGY_DEMAND = -1;

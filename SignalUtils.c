@@ -1,7 +1,3 @@
-//
-// Created by lelelele29 on 07/12/23.
-//
-
 #include "SignalUtils.h"
 #include <signal.h>
 #include <unistd.h>
