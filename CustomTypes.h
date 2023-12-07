@@ -4,6 +4,7 @@
 #include "NodeUtils.h"
 
 typedef enum {false, true} boolean;
+typedef enum {MASTER_SIGNAL_SEMAPHORE} SemaphoreType;
 typedef Node* Atom;
 
 #define maxMessageLength 100

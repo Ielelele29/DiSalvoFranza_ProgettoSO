@@ -44,7 +44,7 @@ int main() {
 
     messageReceiveChannel = msgget(getpid(), IPC_CREAT | 0644);
     setSignalAction(SIGUSR1, onReceiveMessage);
-    int signalSemaphore = getSemaphore(0);
+    int signalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     unlockSemaphore(signalSemaphore);
     printf("pid padre %i", getpid());
     /*
@@ -174,7 +174,7 @@ void onReceiveMessage(int sig)
         free(request);
         free(process);
     }
-    int semId = getSemaphore(0);
+    int semId = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     unlockSemaphore(semId);
 }
 
