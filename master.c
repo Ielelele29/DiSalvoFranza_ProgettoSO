@@ -7,6 +7,7 @@
 #include "MessageUtils.h"
 #include "SemaphoreUtils.h"
 #include "SignalUtils.h"
+#include "KeyUtils.h"
 
 int ENERGY_DEMAND = -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
@@ -42,7 +43,7 @@ int main() {
     printf("SIM_DURATION = %i\n", SIM_DURATION);
 
 
-    messageReceiveChannel = msgget(getpid(), IPC_CREAT | 0644);
+    messageReceiveChannel = msgget(getKey(getpid()), IPC_CREAT | 0644);
     setSignalAction(SIGUSR1, onReceiveMessage);
     int signalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     unlockSemaphore(signalSemaphore);
@@ -163,6 +164,15 @@ void onReceiveMessage(int sig)
             sendMessage(processPid, createMessage(2, "atomEnd"));
         }
         else if (stringEquals(request, "atomKill"))
+        {
+            int processPid = atoi(process);
+            Atom toDelete = searchNodeValue(atoms, processPid);
+            if (toDelete != NULL)
+            {
+                removeNode(toDelete);
+            }
+        }
+        else if (stringEquals(request, "atomCreate"))
         {
             int processPid = atoi(process);
             Atom toDelete = searchNodeValue(atoms, processPid);

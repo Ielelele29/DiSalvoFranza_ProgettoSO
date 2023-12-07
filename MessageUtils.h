@@ -13,6 +13,8 @@ Message createEmptyMessage();
 
 void sendMessage(pid_t targetPid, Message message);
 
+int getMessageId(pid_t pid);
+
 void killMessageChannel(pid_t targetPid);
 
 #endif //DISALVOFRANZA_PROGETTOSO_MESSAGEUTILS_H

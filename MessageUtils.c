@@ -44,6 +44,11 @@ void sendMessage(pid_t targetPid, Message message)
     msgsnd(msgId, &message, sizeof(message), 0);
 }
 
+int getMessageId(pid_t pid)
+{
+    return msgget(getKey(pid), IPC_CREAT | 0644);
+}
+
 void killMessageChannel(pid_t targetPid)
 {
     int msgId = msgget(getKey(targetPid), IPC_CREAT);
