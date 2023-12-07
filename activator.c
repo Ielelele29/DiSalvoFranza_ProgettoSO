@@ -2,62 +2,97 @@
 #include <stdlib.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
 #include "StringUtils.h"
 #include "MessageUtils.h"
+#include "CustomTypes.h"
+#include "SemaphoreUtils.h"
+#include "SignalUtils.h"
+#include <signal.h>
 
 void tick();
+void split();
+int MIN_N_ATOMICO = -1;
 
 int main() {
 
-#if 0
-    key_t key = 10002;
-    int msgId = msgget(key, IPC_CREAT | 0644);
-
-    errno = 0;
-    printf("id = %i\n", msgId);
-    Message message = createEmptyMessage();
-    msgrcv(msgId, &message, sizeof(message), 1, 0);
-    printf("Error = %s\n", strerror(errno));
-    printf("Messaggio con id %li arrivato = %s", message.messageType, message.messageText);
-#endif
-
-
-    key_t key = getpid();
-    int msgId = msgget(key, IPC_CREAT | 0644);
+    int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
     while(true)
     {
-        if(msgrcv(msgId, &message, sizeof(message), 1, 0) > 0)
+        if(msgrcv(msgId, &message, sizeof(message), 0, 0) != -1)
         {
-            if (stringEquals(message.messageText, "tick"))
+            if (message.messageType == 2)
             {
-                tick();
-            }
-            else if (stringEquals(message.messageText, "term"))
-            {
-                break;
+                if(stringStartsWith(message.messageText,"MIN_N_ATOMICO="))
+                {
+                    MIN_N_ATOMICO = atoi(stringAfter(message.messageText, "MIN_N_ATOMICO="));
+                    tick();
+                    break;
+                }
+                else
+                {
+                    printf("Error invalid message!\n");
+                    printf("Waiting for a new message...\n");
+                }
             }
             else
             {
-                printf("Error invalid message!\n");
-                break;
+                printf("Error invalid message!(invalid type of message)\n");
+                printf("Waiting for a new message...\n");
             }
         }
         else
         {
             printf("Error receiving message!\n");
+            printf("Waiting for a new message...\n");
         }
     }
-
 
     return 0;
 }
 
 
 void tick(){
-    printf("Activator tick\n");
-    // TODO comunicazione scissione atomi
+
+    int msgId = getMessageId(getpid());
+    Message message = createEmptyMessage();
+
+    while(true)
+    {
+        if(msgrcv(msgId, &message, sizeof(message), 1, IPC_NOWAIT) == -1)
+        {
+            split();
+        }
+        else
+        {
+            if (stringEquals(message.messageText, "term"))
+            {
+                printf("Activator termination!\n");
+                break;
+            }
+            else
+            {
+                split();
+            }
+
+        }
+    }
+}
+
+void split()
+{
+    // prelevo pid che mi servono;
+    pid_t pidMaster = getppid();
+    int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
+    waitAndLockSemaphore(sem);
+    sendMessage(pidMaster, createMessage(stringJoin("atomList=", intToString(getpid()))));
+    sendSignal(pidMaster, SIGUSR1);
+
+
+    Message message = createMessage(1,"split");
+    Message message1 = createMessage(2,stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)));
+    sendMessage(atomoPid, message1);
+    sendMessage(atomoPid, message);
+
 }

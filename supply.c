@@ -3,24 +3,27 @@
 #include <time.h>
 #include <errno.h>
 #define _GNU_SOURCE
+#include "CustomTypes.h"
 #include <stdlib.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
-#include <errno.h>
 #include <string.h>
 #include "StringUtils.h"
 #include "MessageUtils.h"
+#include "SemaphoreUtils.h"
+#include "SignalUtils.h"
+#include <signal.h>
 
 void tick();
 void createAtoms();
 void waitNano();
-int N_NUOVI_ATOMI = -1;
+int N_NUOVI_ATOMI= -1;
 int STEP = -1;
+int N_ATOM_MAX= -1;
 
 int main() {
 
-    key_t key = getpid();
-    int msgId = msgget(key, IPC_CREAT | 0644);
+    int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
     while(true)
     {
@@ -38,6 +41,10 @@ int main() {
                     tick();
                     break;
                 }
+                else if(stringStartsWith(message.messageText,"N_ATOM_MAX="))
+                {
+                    N_ATOM_MAX = atoi(stringAfter(message.messageText,"N_ATOM_MAX="));
+                }
                 else
                 {
                     printf("Error invalid message!\n");
@@ -47,7 +54,7 @@ int main() {
             }
             else
             {
-                printf("Error invalid message!\n");
+                printf("Error invalid message!(invalid type of message)\n");
                 printf("Waiting for a new message...\n");
             }
         }
@@ -63,8 +70,7 @@ int main() {
 
 void tick(){
 
-    key_t key = getpid();
-    int msgId = msgget(key, IPC_CREAT | 0644);
+    int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
 
     while(true)
@@ -100,5 +106,34 @@ void waitNano()
 
 void createAtoms()
 {
-    printf("Crea N_NUOVI_ATOMI %d\n",N_NUOVI_ATOMI);
+    pid_t pidMaster = getppid();
+    int i = 0;
+    printf("Crea %d_NUOVI_ATOMI \n", N_NUOVI_ATOMI);
+
+    while(i < N_NUOVI_ATOMI)
+    {
+        printf("Creazione processo Atomo da Supply...\n");
+        pid_t atomPid = fork();
+        if (atomPid == -1)
+        {
+            printf("Errore durante la creazione del processo Atomo\n");
+            //TODO meltdown
+        }
+        else if (atomPid == 0)
+        {
+            char *forkArgs[] = {NULL};
+            char *forkEnv[] = {NULL};
+            printf("Creo il %d° processo atomo con supply\n", i+1);
+            execve("./Atom", forkArgs, forkEnv);
+            printf("Errore Processo Atomo\n");
+            return;
+        }
+        int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
+        waitAndLockSemaphore(sem);
+        sendMessage(pidMaster, createMessage(2, stringJoin("atomCreate=", intToString(atomPid))));
+        sendMessage(atomPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
+        i++;
+    }
+    sendSignal(pidMaster, SIGUSR1);
+
 }
