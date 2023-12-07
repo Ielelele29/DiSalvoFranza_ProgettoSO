@@ -29,7 +29,7 @@ int sharedMemoryId = -1;
 int signalSemaphore = -1;
 int statisticsSemaphore = -1;
 
-int cumulativeStatistics[8] = {0};
+int cumulativeStatistics[10] = {0};
 
 
 Atom atoms;
@@ -53,7 +53,7 @@ int main() {
     printf("SIM_DURATION = %i\n", SIM_DURATION);
 
 
-    sharedMemoryId = getSharedMemoryId(0, sizeof(int)*8);
+    sharedMemoryId = getSharedMemoryId(0, sizeof(int)*10);
     messageReceiveChannel = getMessageId(getpid());
     setSignalAction(SIGUSR1, onReceiveMessage);
     signalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
@@ -159,12 +159,14 @@ void tick()
     printf("Numero di scissioni: %i\n", statistics[SPLIT_AMOUNT]);
     printf("Energia prodotta: %i\n", statistics[ENERGY_PRODUCED]);
     printf("Energia consumata: %i\n", statistics[ENERGY_CONSUMED]);
+    printf("Atomi creati: %i\n", statistics[CREATED_ATOMS]);
+    printf("Scorie: %i\n", statistics[DEAD_ATOMS]);
     printf("\n-----INIBITORE-----\n");
     printf("Scissioni degli atomi rallentate: %i\n", statistics[DELAYED_ATOM_SPLIT]);
     printf("Terminazioni per EXPLODE evitate: %i\n", statistics[AVOIDED_EXPLOSIONS]);
     printf("Terminazioni per MELTDOWNS evitate: %i\n", statistics[AVOIDED_MELTDOWNS]);
 
-    for (int i = 0; i < 7; i++)
+    for (int i = 0; i < 9; i++)
     {
         cumulativeStatistics[i] += statistics[i];
     }
@@ -173,15 +175,17 @@ void tick()
     printf("Numero di scissioni: %i\n", cumulativeStatistics[SPLIT_AMOUNT]);
     printf("Energia prodotta: %i\n", cumulativeStatistics[ENERGY_PRODUCED]);
     printf("Energia consumata: %i\n", cumulativeStatistics[ENERGY_CONSUMED]);
+    printf("Atomi creati: %i\n", cumulativeStatistics[CREATED_ATOMS]);
+    printf("Scorie: %i\n", cumulativeStatistics[DEAD_ATOMS]);
     printf("\n-----INIBITORE-----\n");
     printf("Scissioni degli atomi rallentate: %i\n", cumulativeStatistics[DELAYED_ATOM_SPLIT]);
     printf("Terminazioni per EXPLODE evitate: %i\n", cumulativeStatistics[AVOIDED_EXPLOSIONS]);
     printf("Terminazioni per MELTDOWNS evitate: %i\n", cumulativeStatistics[AVOIDED_MELTDOWNS]);
 
     clearSharedMemory(sharedMemoryId);
-    statistics[ENERGY_CONSUMED] += ENERGY_DEMAND;
     if (cumulativeStatistics[ENERGY_AMOUNT] >= ENERGY_DEMAND)
     {
+        statistics[ENERGY_CONSUMED] += ENERGY_DEMAND;
         cumulativeStatistics[ENERGY_AMOUNT] -= ENERGY_DEMAND;
         statistics[ENERGY_AMOUNT] = cumulativeStatistics[ENERGY_AMOUNT];
     }
