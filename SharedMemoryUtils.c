@@ -12,7 +12,7 @@
 
 int getSharedMemoryId(int id, int size)
 {
-    int sharedMemoryId = shmget(getKey(id), size, IPC_CREAT | 0666);
+    int sharedMemoryId = shmget(getKey(id), size, IPC_CREAT | 0644);
     if (sharedMemoryId == -1)
     {
         printf("Get shared memory id error");
@@ -42,6 +42,16 @@ int getSharedMemorySize(int sharedMemoryId)
         return -1;
     }
     return (int) sharedMemoryInfo.shm_segsz;
+}
+
+void clearSharedMemory(int sharedMemoryId)
+{
+    int memorySize = getSharedMemorySize(sharedMemoryId);
+    char* memory = getSharedMemory(sharedMemoryId);
+    for (int i = 0; i < memorySize; i++)
+    {
+        memory[i] = 0;
+    }
 }
 
 void deleteSharedMemory(int sharedMemoryId)
