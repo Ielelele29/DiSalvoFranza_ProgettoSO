@@ -47,7 +47,7 @@ int main() {
     int signalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     unlockSemaphore(signalSemaphore);
     printf("pid padre %i", getpid());
-    /*
+
     printf("Creazione processo Alimentazione...\n");
     pid_t pid = fork();
     if (pid < 0)
@@ -88,7 +88,7 @@ int main() {
     }
     activatorPid = pid;
     sendMessage(activatorPid, createMessage(2, stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO))));
-*/
+
 
     for (int i = 0; i < N_ATOMI_INIT; i++)
     {
