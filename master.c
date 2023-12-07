@@ -43,7 +43,7 @@ int main() {
     printf("SIM_DURATION = %i\n", SIM_DURATION);
 
 
-    messageReceiveChannel = msgget(getKey(getpid()), IPC_CREAT | 0644);
+    messageReceiveChannel = getMessageId(getpid());
     setSignalAction(SIGUSR1, onReceiveMessage);
     int signalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     unlockSemaphore(signalSemaphore);
@@ -175,10 +175,9 @@ void onReceiveMessage(int sig)
         else if (stringEquals(request, "atomCreate"))
         {
             int processPid = atoi(process);
-            Atom toDelete = searchNodeValue(atoms, processPid);
-            if (toDelete != NULL)
+            if (processPid > 0)
             {
-                removeNode(toDelete);
+                addNode(&atoms, processPid);
             }
         }
         free(request);
