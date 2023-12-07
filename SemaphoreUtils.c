@@ -1,7 +1,3 @@
-//
-// Created by lelelele29 on 04/12/23.
-//
-
 #include "SemaphoreUtils.h"
 #include "KeyUtils.h"
 #include <stdio.h>

@@ -7,7 +7,7 @@
 #include "MessageUtils.h"
 #include "SemaphoreUtils.h"
 #include "SignalUtils.h"
-#include "KeyUtils.h"
+#include "SharedMemoryUtils.h"
 
 int ENERGY_DEMAND = -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
@@ -21,13 +21,22 @@ int SIM_DURATION = -1;
 pid_t supplyPid = -1;
 pid_t activatorPid = -1;
 
-int messageReceiveChannel;
+int messageReceiveChannel = -1;
+
+int sharedMemoryId = -1;
+
+int signalSemaphore = -1;
+int statisticsSemaphore = -1;
+
+int cumulativeStatistics[10] = {0};
+
 
 Atom atoms;
 
 void readConfig();
 void tick();
 void onReceiveMessage(int sig);
+void terminate(TerminationType reason);
 
 int main() {
     printf("Hello, World 4!\n");
@@ -43,10 +52,14 @@ int main() {
     printf("SIM_DURATION = %i\n", SIM_DURATION);
 
 
-    messageReceiveChannel = msgget(getKey(getpid()), IPC_CREAT | 0644);
+    sharedMemoryId = getSharedMemoryId(0, sizeof(int)*10);
+    messageReceiveChannel = getMessageId(getpid());
     setSignalAction(SIGUSR1, onReceiveMessage);
-    int signalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
+    signalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     unlockSemaphore(signalSemaphore);
+    statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
+    clearSharedMemory(sharedMemoryId);
+    unlockSemaphore(statisticsSemaphore);
     printf("pid padre %i", getpid());
 
     printf("Creazione processo Alimentazione...\n");
@@ -68,6 +81,7 @@ int main() {
     supplyPid = pid;
     sendMessage(supplyPid, createMessage(2, stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI))));
     sendMessage(supplyPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
+    sendMessage(supplyPid, createMessage(2, stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD))));
 
     printf("riga = %s\n", stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI)));
 
@@ -127,65 +141,153 @@ int main() {
     sendMessage(supplyPid, createMessage(2, stringJoin("STEP=", intToString(STEP))));
     while (SIM_DURATION > 0)
     {
-        tick();
         sleep(1);
+        tick();
         SIM_DURATION--;
+    }
+    terminate(TIMEOUT);
+    return 0;
+}
+
+void tick()
+{
+    waitAndLockSemaphore(statisticsSemaphore);
+    int* statistics = getSharedMemory(sharedMemoryId);
+    printf("\n\nOperazioni nell'ultimo secondo:\n");
+    printf("Attivazione/i dell'attivatore: %i\n", statistics[ACTIVATION_AMOUNT]);
+    printf("Numero di scissioni: %i\n", statistics[SPLIT_AMOUNT]);
+    printf("Energia prodotta: %i\n", statistics[ENERGY_PRODUCED]);
+    printf("Energia consumata: %i\n", statistics[ENERGY_CONSUMED]);
+    printf("Atomi creati: %i\n", statistics[CREATED_ATOMS]);
+    printf("Scorie: %i\n", statistics[DEAD_ATOMS]);
+    printf("\n-----INIBITORE-----\n");
+    printf("Scissioni degli atomi rallentate: %i\n", statistics[DELAYED_ATOM_SPLIT]);
+    printf("Terminazioni per EXPLODE evitate: %i\n", statistics[AVOIDED_EXPLOSIONS]);
+    printf("Terminazioni per MELTDOWNS evitate: %i\n", statistics[AVOIDED_MELTDOWNS]);
+
+    for (int i = 0; i < 9; i++)
+    {
+        cumulativeStatistics[i] += statistics[i];
+    }
+    printf("\n\nOperazioni dall'avvio del programma:\n");
+    printf("Attivazione/i dell'attivatore: %i\n", cumulativeStatistics[ACTIVATION_AMOUNT]);
+    printf("Numero di scissioni: %i\n", cumulativeStatistics[SPLIT_AMOUNT]);
+    printf("Energia prodotta: %i\n", cumulativeStatistics[ENERGY_PRODUCED]);
+    printf("Energia consumata: %i\n", cumulativeStatistics[ENERGY_CONSUMED]);
+    printf("Atomi creati: %i\n", cumulativeStatistics[CREATED_ATOMS]);
+    printf("Scorie: %i\n", cumulativeStatistics[DEAD_ATOMS]);
+    printf("\n-----INIBITORE-----\n");
+    printf("Scissioni degli atomi rallentate: %i\n", cumulativeStatistics[DELAYED_ATOM_SPLIT]);
+    printf("Terminazioni per EXPLODE evitate: %i\n", cumulativeStatistics[AVOIDED_EXPLOSIONS]);
+    printf("Terminazioni per MELTDOWNS evitate: %i\n", cumulativeStatistics[AVOIDED_MELTDOWNS]);
+
+    clearSharedMemory(sharedMemoryId);
+    if (cumulativeStatistics[ENERGY_AMOUNT] >= ENERGY_DEMAND)
+    {
+        statistics[ENERGY_CONSUMED] += ENERGY_DEMAND;
+        cumulativeStatistics[ENERGY_AMOUNT] -= ENERGY_DEMAND;
+        statistics[ENERGY_AMOUNT] = cumulativeStatistics[ENERGY_AMOUNT];
+    }
+    else
+    {
+        terminate(BLACKOUT);
+    }
+    unlockSemaphore(statisticsSemaphore);
+}
+
+void terminate(TerminationType reason)
+{
+    if (reason == TIMEOUT)
+    {
+        printf("Spegnimento programma... (TIMEOUT)");
+    }
+    else if (reason == EXPLODE)
+    {
+        printf("Spegnimento programma... (EXPLODE)");
+    }
+    else if (reason == BLACKOUT)
+    {
+        printf("Spegnimento programma... (BLACKOUT)");
+    }
+    else if (reason == MELTDOWN)
+    {
+        printf("Spegnimento programma... (MELTDOWN)");
+    }
+    while (atoms != NULL)
+    {
+        int pid = atoms->value;
+        sendMessage(pid, createMessage(1, "term"));
+        killMessageChannel(pid);
+        atoms = getNextNode(atoms);
     }
     sendMessage(supplyPid, createMessage(1, "term"));
     killMessageChannel(supplyPid);
     sendMessage(activatorPid, createMessage(1, "term"));
     killMessageChannel(activatorPid);
     killMessageChannel(messageReceiveChannel);
+    deleteSharedMemory(sharedMemoryId);
     deleteSemaphore(signalSemaphore);
-    return 0;
-}
-
-void tick()
-{
-    printf("Master Tick\n");
+    deleteSemaphore(statisticsSemaphore);
+    exit(0);
 }
 
 void onReceiveMessage(int sig)
 {
-    Message message = createEmptyMessage();
-    if (msgrcv(messageReceiveChannel, &message, sizeof(message), 2, IPC_NOWAIT) != -1)
+    if (sig == SIGUSR1)
     {
-        char* request = stringBefore(message.messageText, "=");
-        char* process = stringAfter(message.messageText, "=");
-        if (stringEquals(request, "atomList"))
+        Message message = createEmptyMessage();
+        while (msgrcv(messageReceiveChannel, &message, sizeof(message), 0, IPC_NOWAIT) != -1)
         {
-            int processPid = atoi(process);
-            Atom readingAtom = atoms;
-            while (readingAtom != NULL)
+            if (message.messageType == 1)
             {
-                sendMessage(processPid, createMessage(2, stringJoin("atomPid=", intToString(readingAtom->value))));
-                readingAtom = readingAtom->nextNode;
+                if (stringEquals(message.messageText, "EXPLODE"))
+                {
+                    terminate(EXPLODE);
+                }
+                else if (stringEquals(message.messageText, "MELTDOWN"))
+                {
+                    terminate(MELTDOWN);
+                }
             }
-            sendMessage(processPid, createMessage(2, "atomEnd"));
-        }
-        else if (stringEquals(request, "atomKill"))
-        {
-            int processPid = atoi(process);
-            Atom toDelete = searchNodeValue(atoms, processPid);
-            if (toDelete != NULL)
+            else if (message.messageType == 2)
             {
-                removeNode(toDelete);
+                char* request = stringBefore(message.messageText, "=");
+                char* process = stringAfter(message.messageText, "=");
+                if (stringEquals(request, "atomList"))
+                {
+                    int processPid = atoi(process);
+                    Atom readingAtom = atoms;
+                    while (readingAtom != NULL)
+                    {
+                        sendMessage(processPid, createMessage(2, stringJoin("atomPid=", intToString(readingAtom->value))));
+                        readingAtom = readingAtom->nextNode;
+                    }
+                    sendMessage(processPid, createMessage(2, "atomEnd"));
+                }
+                else if (stringEquals(request, "atomKill"))
+                {
+                    int processPid = atoi(process);
+                    Atom toDelete = searchNodeValue(atoms, processPid);
+                    if (toDelete != NULL)
+                    {
+                        removeNode(toDelete);
+                    }
+                }
+                else if (stringEquals(request, "atomCreate"))
+                {
+                    int processPid = atoi(process);
+                    if (processPid > 0)
+                    {
+                        addNode(&atoms, processPid);
+                    }
+                }
+                free(request);
+                free(process);
             }
         }
-        else if (stringEquals(request, "atomCreate"))
-        {
-            int processPid = atoi(process);
-            Atom toDelete = searchNodeValue(atoms, processPid);
-            if (toDelete != NULL)
-            {
-                removeNode(toDelete);
-            }
-        }
-        free(request);
-        free(process);
+        int semId = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
+        unlockSemaphore(semId);
     }
-    int semId = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
-    unlockSemaphore(semId);
 }
 
 

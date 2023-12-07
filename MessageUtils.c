@@ -1,12 +1,6 @@
-//
-// Created by lelelele29 on 04/12/23.
-//
-
 #include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
-#include <errno.h>
-#include <stdio.h>
 #include <string.h>
 #include "MessageUtils.h"
 #include "CustomTypes.h"
@@ -44,9 +38,9 @@ void sendMessage(pid_t targetPid, Message message)
     msgsnd(msgId, &message, sizeof(message), 0);
 }
 
-int getMessageId(pid_t pid)
+int getMessageId(pid_t targetPid)
 {
-    return msgget(getKey(pid), IPC_CREAT | 0644);
+    return msgget(getKey(targetPid), IPC_CREAT | 0644);
 }
 
 void killMessageChannel(pid_t targetPid)
