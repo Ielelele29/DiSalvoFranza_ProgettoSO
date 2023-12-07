@@ -36,7 +36,7 @@ char* string(char* string)
     return stringCut(string, 0, -1);
 }
 
-char* emptyString(int length)
+char* emptyString(unsigned long length)
 {
     return malloc(sizeof(char)*length);
 }

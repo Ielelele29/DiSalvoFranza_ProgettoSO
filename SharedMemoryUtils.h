@@ -5,9 +5,11 @@
 #ifndef DISALVOFRANZA_PROGETTOSO_SHAREDMEMORYUTILS_H
 #define DISALVOFRANZA_PROGETTOSO_SHAREDMEMORYUTILS_H
 
-int getSharedMemoryId(int id, unsigned long size);
+int getSharedMemoryId(int id, int size);
 
 void* getSharedMemory(int sharedMemoryId);
+
+int getSharedMemorySize(int sharedMemoryId);
 
 void deleteSharedMemory(int sharedMemoryId);
 

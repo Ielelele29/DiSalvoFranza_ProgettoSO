@@ -1,0 +1,10 @@
+//
+// Created by lelelele29 on 07/12/23.
+//
+
+#ifndef DISALVOFRANZA_PROGETTOSO_KEYUTILS_H
+#define DISALVOFRANZA_PROGETTOSO_KEYUTILS_H
+
+int getKey(int id);
+
+#endif //DISALVOFRANZA_PROGETTOSO_KEYUTILS_H

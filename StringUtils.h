@@ -9,7 +9,7 @@ char* stringCut(char* string, int start, int end);
 
 char* string(char* string);
 
-char* emptyString(int length);
+char* emptyString(unsigned long length);
 
 char* stringClearChar(char* string, char c);
 

@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/msg.h>
 #include "StringUtils.h"
 #include "MessageUtils.h"
 #include "SemaphoreUtils.h"
-#include "AtomUtils.h"
+#include "SignalUtils.h"
 
 int ENERGY_DEMAND = -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
@@ -15,16 +17,20 @@ int MIN_N_ATOMICO = -1;
 int STEP = -1;
 int SIM_DURATION = -1;
 
-#define MAX_ATOMS 100
-
 pid_t supplyPid = -1;
 pid_t activatorPid = -1;
 
+int messageReceiveChannel;
+
+Atom atoms;
+
 void readConfig();
 void tick();
+void onReceiveMessage(int sig);
 
 int main() {
     printf("Hello, World 4!\n");
+
     readConfig();
     printf("ENERGY_DEMAND = %i\n", ENERGY_DEMAND);
     printf("ENERGY_EXPLODE_THRESHOLD = %i\n", ENERGY_EXPLODE_THRESHOLD);
@@ -36,6 +42,12 @@ int main() {
     printf("SIM_DURATION = %i\n", SIM_DURATION);
 
 
+    messageReceiveChannel = msgget(getpid(), IPC_CREAT | 0644);
+    setSignalAction(SIGUSR1, onReceiveMessage);
+    int signalSemaphore = getSemaphore(0);
+    unlockSemaphore(signalSemaphore);
+    printf("pid padre %i", getpid());
+    /*
     printf("Creazione processo Alimentazione...\n");
     pid_t pid = fork();
     if (pid < 0)
@@ -54,6 +66,8 @@ int main() {
     }
     supplyPid = pid;
     sendMessage(supplyPid, createMessage(2, stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI))));
+    sendMessage(supplyPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
+
     printf("riga = %s\n", stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI)));
 
     printf("Creazione processo Attivatore...\n");
@@ -73,15 +87,13 @@ int main() {
         return 0;
     }
     activatorPid = pid;
+    sendMessage(activatorPid, createMessage(2, stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO))));
+*/
 
-    int atomMemoryId = createAtomMemory(MAX_ATOMS);
-    int* atomMemory = getAtomMemory(atomMemoryId);
-    int atomSemaphoreId = getAtomSemaphore();
-    unlockSemaphore(atomSemaphoreId);
     for (int i = 0; i < N_ATOMI_INIT; i++)
     {
         printf("Creazione processo Atomo...\n");
-        int sem = waitAndLockSemaphore(atomSemaphoreId);
+        sleep(1);
         pid_t atomPid = fork();
         if (atomPid == -1)
         {
@@ -90,25 +102,27 @@ int main() {
         }
         else if (atomPid == 0)
         {
-            int slot = getFirstFreeAtomSlot(atomMemoryId, MAX_ATOMS);
-            if (slot != -1 && sem != -1)
-            {
-                atomMemory[slot] = atomPid;
-                unlockSemaphore(atomSemaphoreId);
-                char* forkArgs[] = {NULL};
-                char* forkEnv[] = {NULL};
-                printf("Processo Atomo creato correttamente\n");
-                execve("./Atom", forkArgs, forkEnv);
-            }
-            else
-            {
-                //TODO TERMINAZIONE PER IMPOSSIBILITA' CREAZIONE ATOMO
-            }
+            char* forkArgs[] = {NULL};
+            char* forkEnv[] = {NULL};
+            printf("Processo Atomo creato correttamente\n");
+            execve("./Atom", forkArgs, forkEnv);
             printf("Errore Processo Atomo\n");
             return 0;
         }
+        addNode(&atoms, atomPid);
     }
 
+
+    Atom readingAtom = atoms;
+    while (readingAtom != NULL)
+    {
+        printf("Atom PID = %i\n", getNodeValue(readingAtom));
+        if (!hasNextNode(atoms))
+        {
+            break;
+        }
+        readingAtom = getNextNode(readingAtom);
+    }
     sendMessage(supplyPid, createMessage(2, stringJoin("STEP=", intToString(STEP))));
     while (SIM_DURATION > 0)
     {
@@ -120,14 +134,48 @@ int main() {
     killMessageChannel(supplyPid);
     sendMessage(activatorPid, createMessage(1, "term"));
     killMessageChannel(activatorPid);
-    deleteSemaphore(atomSemaphoreId);
-    deleteAtomMemory(atomMemoryId);
+    killMessageChannel(messageReceiveChannel);
+    deleteSemaphore(signalSemaphore);
     return 0;
 }
 
 void tick()
 {
     printf("Master Tick\n");
+}
+
+void onReceiveMessage(int sig)
+{
+    Message message = createEmptyMessage();
+    if (msgrcv(messageReceiveChannel, &message, sizeof(message), 2, IPC_NOWAIT) != -1)
+    {
+        char* request = stringBefore(message.messageText, "=");
+        char* process = stringAfter(message.messageText, "=");
+        if (stringEquals(request, "atomList"))
+        {
+            int processPid = atoi(process);
+            Atom readingAtom = atoms;
+            while (readingAtom != NULL)
+            {
+                sendMessage(processPid, createMessage(2, stringJoin("atomPid=", intToString(readingAtom->value))));
+                readingAtom = readingAtom->nextNode;
+            }
+            sendMessage(processPid, createMessage(2, "atomEnd"));
+        }
+        else if (stringEquals(request, "atomKill"))
+        {
+            int processPid = atoi(process);
+            Atom toDelete = searchNodeValue(atoms, processPid);
+            if (toDelete != NULL)
+            {
+                removeNode(toDelete);
+            }
+        }
+        free(request);
+        free(process);
+    }
+    int semId = getSemaphore(0);
+    unlockSemaphore(semId);
 }
 
 

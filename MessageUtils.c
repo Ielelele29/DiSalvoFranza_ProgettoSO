@@ -10,6 +10,7 @@
 #include <string.h>
 #include "MessageUtils.h"
 #include "CustomTypes.h"
+#include "KeyUtils.h"
 
 Message createMessage(long type, const char* string)
 {
@@ -39,14 +40,12 @@ Message createEmptyMessage()
 
 void sendMessage(pid_t targetPid, Message message)
 {
-    key_t key = targetPid;
-    int msgId = msgget(key, IPC_CREAT | 0644);
+    int msgId = msgget(getKey(targetPid), IPC_CREAT | 0644);
     msgsnd(msgId, &message, sizeof(message), 0);
 }
 
 void killMessageChannel(pid_t targetPid)
 {
-    key_t key = targetPid;
-    int msgId = msgget(key, IPC_CREAT);
+    int msgId = msgget(getKey(targetPid), IPC_CREAT);
     msgctl(msgId, IPC_RMID, NULL);
 }
