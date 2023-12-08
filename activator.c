@@ -13,6 +13,7 @@
 void tick();
 void split();
 int MIN_N_ATOMICO = -1;
+int ENERGY_EXPLODE_THRESHOLD = -1;
 
 int main() {
 
@@ -28,6 +29,11 @@ int main() {
                 {
                     MIN_N_ATOMICO = atoi(stringAfter(message.messageText, "MIN_N_ATOMICO="));
                     tick();
+                    break;
+                }
+                else if(stringStartsWith(message.messageText,"ENERGY_EXPLODE_THRESHOLD="))
+                {
+                    ENERGY_EXPLODE_THRESHOLD = atoi(stringAfter(message.messageText, "ENERGY_EXPLODE_THRESHOLD="));
                     break;
                 }
                 else
@@ -90,9 +96,8 @@ void split()
     sendSignal(pidMaster, SIGUSR1);
 
 
-    Message message = createMessage(1,"split");
-    Message message1 = createMessage(2,stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)));
-    sendMessage(atomoPid, message1);
-    sendMessage(atomoPid, message);
+    sendMessage(atomoPid, createMessage(2,stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)));
+    sendMessage(atomoPid, createMessage(2,stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)));
+    sendMessage(atomoPid, createMessage(1,"split"););
 
 }

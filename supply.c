@@ -129,9 +129,9 @@ void createAtoms()
             return;
         }
         int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
+        sendMessage(atomPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
         waitAndLockSemaphore(sem);
         sendMessage(pidMaster, createMessage(2, stringJoin("atomCreate=", intToString(atomPid))));
-        sendMessage(atomPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
         i++;
     }
     sendSignal(pidMaster, SIGUSR1);

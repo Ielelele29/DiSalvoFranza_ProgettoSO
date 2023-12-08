@@ -11,14 +11,23 @@
 #include "StringUtils.h"
 #include "MessageUtils.h"
 #include "SemaphoreUtils.h"
+#include "SharedMemoryUtils.h"
 
 int N_ATOM_MAX = -1;
 int MIN_N_ATOMICO = -1;
 boolean split();
 int numAtom = 0;
+int ENERGY_EXPLODE_THRESHOLD = -1;
 
 
 int main() {
+
+
+    int statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
+    waitAndLockSemaphore(statisticsSemaphore);
+    int sharedMemoryId = getSharedMemoryId(0, sizeof(int)*10);
+    int* statistics = getSharedMemory(sharedMemoryId);
+
 
     int i = 0;
     int msgId = getMessageId(getpid());
@@ -34,12 +43,14 @@ int main() {
                     N_ATOM_MAX = atoi(stringAfter(message.messageText,"N_ATOM_MAX="));
                     srand(time(NULL));
                     numAtom = rand()%N_ATOM_MAX; //implict +0
-                    i++;
                 }
                 else if(stringStartsWith(message.messageText,"MIN_N_ATOMICO="))
                 {
                     MIN_N_ATOMICO = atoi(stringAfter(message.messageText,"MIN_N_ATOMICO="));
-                    i++;
+                }
+                else if(stringStartsWith(message.messageText,"ENERGY_EXPLODE_THRESHOLD="))
+                {
+                    ENERGY_EXPLODE_THRESHOLD = atoi(stringAfter(message.messageText,"ENERGY_EXPLODE_THRESHOLD="));
                 }
                 else
                 {
@@ -48,25 +59,20 @@ int main() {
 
                 }
             }
-            else if (message.messageType == 1 && i>=2)
+            else if (message.messageType == 1)
             {
-                if (stringEquals(message.messageText, "split"))
-                {
-                    if(split())
-                    {
+                if (stringEquals(message.messageText, "split")) {
+                    if (split()) {
                         printf("Scissione effettuata con successo\n");
-                    }
-                    else
-                    {
+                    } else {
                         // TODO killo il processo
                         break;
                     }
-                }
-                else
-                {
+                } else {
                     printf("Error invalid message!\n");
                     printf("Waiting for a new message...\n");
                 }
+
             }
             else
             {
