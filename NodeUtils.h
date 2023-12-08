@@ -1,13 +1,6 @@
 #ifndef DISALVOFRANZA_PROGETTOSO_NODEUTILS_H
 #define DISALVOFRANZA_PROGETTOSO_NODEUTILS_H
-
 #include "CustomTypes.h"
-
-typedef struct Node {
-    struct Node* previousNode;
-    int value;
-    struct Node* nextNode;
-} Node;
 
 Node* createNode(int value);
 

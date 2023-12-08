@@ -14,7 +14,7 @@
 #include "SignalUtils.h"
 #include <signal.h>
 
-void tick();
+void printStatistics();
 void createAtoms();
 void waitNano();
 int N_NUOVI_ATOMI= -1;
@@ -38,7 +38,7 @@ int main() {
                 else if(stringStartsWith(message.messageText,"STEP="))
                 {
                     STEP = atoi(stringAfter(message.messageText,"STEP="));
-                    tick();
+                    printStatistics();
                     break;
                 }
                 else if(stringStartsWith(message.messageText,"N_ATOM_MAX="))
@@ -68,7 +68,7 @@ int main() {
     return 0;
 }
 
-void tick(){
+void printStatistics(){
 
     int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();

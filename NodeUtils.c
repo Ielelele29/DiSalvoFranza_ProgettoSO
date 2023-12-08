@@ -1,6 +1,6 @@
+#include "NodeUtils.h"
 #include <unistd.h>
 #include <stdlib.h>
-#include "NodeUtils.h"
 #include "CustomTypes.h"
 
 Node* createNode(int value)

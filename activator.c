@@ -10,7 +10,7 @@
 #include "SignalUtils.h"
 #include <signal.h>
 
-void tick();
+void printStatistics();
 void split();
 int MIN_N_ATOMICO = -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
@@ -28,7 +28,7 @@ int main() {
                 if(stringStartsWith(message.messageText,"MIN_N_ATOMICO="))
                 {
                     MIN_N_ATOMICO = atoi(stringAfter(message.messageText, "MIN_N_ATOMICO="));
-                    tick();
+                    printStatistics();
                     break;
                 }
                 else if(stringStartsWith(message.messageText,"ENERGY_EXPLODE_THRESHOLD="))
@@ -59,7 +59,7 @@ int main() {
 }
 
 
-void tick(){
+void printStatistics(){
 
     int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
