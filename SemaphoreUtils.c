@@ -8,7 +8,7 @@ int getSemaphore(int id)
     int semId = semget(getKey(id), 1, IPC_CREAT | 0644);
     if (semId == -1)
     {
-        printf("ERRORE");
+        perror("Get semaphore error");
         return -1;
     }
     return semId;
@@ -20,7 +20,7 @@ void deleteSemaphore(int id)
     {
         if (semctl(getKey(id), 0, IPC_RMID) == -1)
         {
-            printf("ERRORE");
+            perror("Delete semaphore error");
         }
     }
 }
@@ -34,7 +34,7 @@ int waitSemaphore(int id)
     int sem = semop(getKey(id), &semOperation, 1);
     if (sem == -1)
     {
-        printf("Wait semaphore error");
+        perror("Wait semaphore error");
     }
     return sem;
 }
@@ -48,7 +48,7 @@ int waitAndLockSemaphore(int id)
     int sem = semop(getKey(id), &semOperation, 1);
     if (sem == -1)
     {
-        printf("Wait and lock semaphore error");
+        perror("Wait and lock semaphore error");
     }
     return sem;
 }
@@ -62,7 +62,7 @@ int unlockSemaphore(int id)
     int sem = semop(getKey(id), &semOperation, 1);
     if (sem == -1)
     {
-        printf("Unlock semaphore error");
+        perror("Unlock semaphore error");
     }
     return sem;
 }

@@ -2,6 +2,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <string.h>
+#include <stdio.h>
 #include "MessageUtils.h"
 #include "CustomTypes.h"
 #include "KeyUtils.h"
@@ -34,17 +35,28 @@ Message createEmptyMessage()
 
 void sendMessage(pid_t targetPid, Message message)
 {
-    int msgId = msgget(getKey(targetPid), IPC_CREAT | 0644);
-    msgsnd(msgId, &message, sizeof(message), 0);
+    int msgId = getMessageId(targetPid);
+    if (msgsnd(msgId, &message, sizeof(message), 0) == -1)
+    {
+        perror("Send message error");
+    }
 }
 
 int getMessageId(pid_t targetPid)
 {
-    return msgget(getKey(targetPid), IPC_CREAT | 0644);
+    int id = msgget(getKey(targetPid), IPC_CREAT | 0644);
+    if (id == -1)
+    {
+        perror("Get message channel id error");
+    }
+    return id;
 }
 
 void killMessageChannel(pid_t targetPid)
 {
-    int msgId = msgget(getKey(targetPid), IPC_CREAT);
-    msgctl(msgId, IPC_RMID, NULL);
+    int msgId = getMessageId(targetPid);
+    if (msgctl(msgId, IPC_RMID, NULL) == -1)
+    {
+        perror("Kill message channel error");
+    }
 }

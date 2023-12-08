@@ -81,7 +81,6 @@ int main() {
     supplyPid = pid;
     sendMessage(supplyPid, createMessage(2, stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI))));
     sendMessage(supplyPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
-    sendMessage(supplyPid, createMessage(2, stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD))));
 
     printf("riga = %s\n", stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI)));
 
@@ -102,6 +101,7 @@ int main() {
         return 0;
     }
     activatorPid = pid;
+    sendMessage(activatorPid, createMessage(2, stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD))));
     sendMessage(activatorPid, createMessage(2, stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO))));
 
 

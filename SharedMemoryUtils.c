@@ -9,22 +9,18 @@ int getSharedMemoryId(int id, int size)
     int sharedMemoryId = shmget(getKey(id), size, IPC_CREAT | 0644);
     if (sharedMemoryId == -1)
     {
-        printf("Get shared memory id error");
+        perror("Get shared memory id error");
     }
     return sharedMemoryId;
 }
 
 void* getSharedMemory(int sharedMemoryId)
 {
-    printf("1");
     void* memory = shmat(sharedMemoryId, NULL, 0);
-    printf("2");
     if (memory == (void*) -1)
     {
-        printf("3");
-        printf("Get shared memory error");
+        perror("Get shared memory error");
     }
-    printf("4");
     return memory;
 }
 
@@ -52,6 +48,6 @@ void deleteSharedMemory(int sharedMemoryId)
 {
     if (shmctl(sharedMemoryId, IPC_RMID, NULL) == -1)
     {
-        printf("Delete shared memory error");
+        perror("Delete shared memory error");
     }
 }
