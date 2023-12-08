@@ -4,7 +4,25 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 #include "NumberUtils.h"
+#include "CustomTypes.h"
+
+boolean isInitialized = false;
+double getRandom()
+{
+    if (!isInitialized)
+    {
+        srand(time(NULL));
+        isInitialized = true;
+    }
+    double random = rand()/(double)RAND_MAX;
+    if (random == 1)
+    {
+        random = 0.999999999999999;
+    }
+    return random;
+}
 
 int getRandomIntBetween(int min, int max)
 {
@@ -14,17 +32,17 @@ int getRandomIntBetween(int min, int max)
         min = max;
         max = temp;
     }
-    int range = max - min;
+    int range = max - min + 1;
     int random = floor(getRandom()*range);
     return random+min;
 }
 
-double getRandom()
+double floor(double num)
 {
-    double random = rand()/(double)RAND_MAX;
-    if (random == 1)
+    int integerPart = (int) num;
+    if (integerPart < 0 && integerPart != num)
     {
-        random = 0.999999999999999;
+        integerPart--;
     }
-    return random;
+    return integerPart;
 }
