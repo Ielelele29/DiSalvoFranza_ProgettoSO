@@ -14,55 +14,67 @@ int getSemaphore(int id)
     return semId;
 }
 
-void deleteSemaphore(int id)
+void deleteSemaphore(int semaphoreId)
 {
-    if (id != -1)
+    if (semaphoreId != -1)
     {
-        if (semctl(getKey(id), 0, IPC_RMID) == -1)
+        if (semctl(semaphoreId, 0, IPC_RMID) == -1)
         {
             perror("Delete semaphore error");
         }
     }
 }
 
-int waitSemaphore(int id)
+int waitSemaphore(int semaphoreId)
 {
-    struct sembuf semOperation;
-    semOperation.sem_num = 0;
-    semOperation.sem_op = 0;
-    semOperation.sem_flg = 0;
-    int sem = semop(getKey(id), &semOperation, 1);
-    if (sem == -1)
+    if (semaphoreId != -1)
     {
-        perror("Wait semaphore error");
+        struct sembuf semOperation;
+        semOperation.sem_num = 0;
+        semOperation.sem_op = 0;
+        semOperation.sem_flg = 0;
+        int sem = semop(semaphoreId, &semOperation, 1);
+        if (sem == -1)
+        {
+            perror("Wait semaphore error");
+        }
+        return sem;
     }
-    return sem;
+    return -1;
 }
 
-int waitAndLockSemaphore(int id)
+int waitAndLockSemaphore(int semaphoreId)
 {
-    struct sembuf semOperation;
-    semOperation.sem_num = 0;
-    semOperation.sem_op = -1;
-    semOperation.sem_flg = 0;
-    int sem = semop(getKey(id), &semOperation, 1);
-    if (sem == -1)
+    if (semaphoreId != -1)
     {
-        perror("Wait and lock semaphore error");
+        struct sembuf semOperation;
+        semOperation.sem_num = 0;
+        semOperation.sem_op = -1;
+        semOperation.sem_flg = 0;
+        int sem = semop(semaphoreId, &semOperation, 1);
+        if (sem == -1)
+        {
+            perror("Wait and lock semaphore error");
+        }
+        return sem;
     }
-    return sem;
+    return -1;
 }
 
-int unlockSemaphore(int id)
+int unlockSemaphore(int semaphoreId)
 {
-    struct sembuf semOperation;
-    semOperation.sem_num = 0;
-    semOperation.sem_op = 1;
-    semOperation.sem_flg = 0;
-    int sem = semop(getKey(id), &semOperation, 1);
-    if (sem == -1)
+    if (semaphoreId != -1)
     {
-        perror("Unlock semaphore error");
+        struct sembuf semOperation;
+        semOperation.sem_num = 0;
+        semOperation.sem_op = 1;
+        semOperation.sem_flg = 0;
+        int sem = semop(semaphoreId, &semOperation, 1);
+        if (sem == -1)
+        {
+            perror("Unlock semaphore error");
+        }
+        return sem;
     }
-    return sem;
+    return -1;
 }

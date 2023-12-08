@@ -46,7 +46,7 @@ void terminate(TerminationType reason);
 
 int createSupply();
 int createActivator();
-int createInhibitor();
+int createInhibitor(boolean active);
 int createAtom();
 
 int main() {
@@ -76,10 +76,26 @@ int main() {
     messageReceiveChannel = getMessageId(getpid());
     unlockSemaphore(signalSemaphore);
 
+
+    //Richiesta di attivazione inibitore
+    char input[1];
+    int isInhibitorActive = -1;
+    while (isInhibitorActive != 0 && isInhibitorActive != 1)
+    {
+        printf("Inserisci 1 per attivare l'inibitore, e 0 per bloccarlo\n");
+        scanf("%s", input);
+    //    fgets(input, sizeof(input), stdin);
+        sscanf(input, "%i", &isInhibitorActive);
+        if (isInhibitorActive != 0 && isInhibitorActive != 1)
+        {
+            printf("Non hai inserito un numero valido\n");
+        }
+    }
+
     //Creazione processi ausiliari
     createSupply();
     createActivator();
-    createInhibitor();
+    createInhibitor(isInhibitorActive);
 
     for (int i = 0; i < N_ATOMI_INIT; i++)
     {
@@ -99,6 +115,10 @@ int main() {
     }*/
 
     //Inizio simulazione
+    sendMessage(supplyPid, createMessage(1, "start"));
+    sendMessage(activatorPid, createMessage(1, "start"));
+    sendMessage(inhibitorPid, createMessage(1, "start"));
+
     while (SIM_DURATION > 0)
     {
         sleep(1);
@@ -199,7 +219,7 @@ void terminate(TerminationType reason)
     killMessageChannel(activatorPid);
     sendMessage(inhibitorPid, createMessage(1, "term"));
     killMessageChannel(inhibitorPid);
-    killMessageChannel(messageReceiveChannel);
+    killMessageChannel(getpid());
     deleteSharedMemory(sharedMemoryId);
     deleteSemaphore(signalSemaphore);
     deleteSemaphore(statisticsSemaphore);
@@ -260,8 +280,7 @@ void onReceiveMessage(int sig)
                 free(process);
             }
         }
-        int semId = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
-        unlockSemaphore(semId);
+        unlockSemaphore(signalSemaphore);
     }
 }
 
@@ -320,7 +339,7 @@ int createActivator()
     return 0;
 }
 
-int createInhibitor()
+int createInhibitor(boolean active)
 {
     printf("Creazione processo Inibitore...\n");
     pid_t pid = fork();
@@ -332,7 +351,7 @@ int createInhibitor()
     else if (pid == 0) //Processo Inibitore
     {
         char* forkArgs[] = {NULL};
-        char* forkEnv[] = {NULL};
+        char* forkEnv[] = {stringJoin("active=", intToString(active)), NULL};
         printf("Processo Inibitore creato correttamente\n");
         execve("./Inhibitor", forkArgs, forkEnv);
         printf("Errore Processo Inibitore\n");

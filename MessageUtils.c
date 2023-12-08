@@ -35,8 +35,7 @@ Message createEmptyMessage()
 
 void sendMessage(pid_t targetPid, Message message)
 {
-    int msgId = getMessageId(targetPid);
-    if (msgsnd(msgId, &message, sizeof(message), 0) == -1)
+    if (msgsnd(getMessageId(targetPid), &message, sizeof(message), 0) == -1)
     {
         perror("Send message error");
     }
@@ -54,8 +53,7 @@ int getMessageId(pid_t targetPid)
 
 void killMessageChannel(pid_t targetPid)
 {
-    int msgId = getMessageId(targetPid);
-    if (msgctl(msgId, IPC_RMID, NULL) == -1)
+    if (msgctl(getMessageId(targetPid), IPC_RMID, NULL) == -1)
     {
         perror("Kill message channel error");
     }
