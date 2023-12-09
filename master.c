@@ -3,12 +3,14 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/msg.h>
+#include <time.h>
 #include "StringUtils.h"
 #include "MessageUtils.h"
 #include "SemaphoreUtils.h"
 #include "SignalUtils.h"
 #include "SharedMemoryUtils.h"
 #include "NodeUtils.h"
+#include "NumberUtils.h"
 
 //Variabili da config
 int ENERGY_DEMAND = -1;
@@ -26,15 +28,22 @@ pid_t activatorPid = -1;
 pid_t inhibitorPid = -1;
 Atom atoms;
 
+struct timespec sleepTime, remaining;
+
+int isInhibitorActive = -1;
+
+
 //Code di messaggi
 int messageReceiveChannel = -1;
 
 //Memoria condivisa
-int sharedMemoryId = -1;
+int statisticsSharedMemoryId = -1;
+int inhibitorSharedMemoryId = -1;
 
 //Semafori
 int signalSemaphore = -1;
 int statisticsSemaphore = -1;
+int inhibitorSemaphore = -1;
 
 //Statistiche
 int cumulativeStatistics[10] = {0};
@@ -42,11 +51,12 @@ int cumulativeStatistics[10] = {0};
 void readConfig();
 void printStatistics();
 void onReceiveMessage(int sig);
+void onActivateDeactivateInhibitor(int sig);
 void terminate(TerminationType reason);
 
 int createSupply();
 int createActivator();
-int createInhibitor(boolean active);
+int createInhibitor();
 int createAtom();
 
 int main() {
@@ -64,11 +74,36 @@ int main() {
     printf("STEP = %i\n", STEP);
     printf("SIM_DURATION = %i\n", SIM_DURATION);
 
-    //Inizializzazione memoria condivisa
+
+    //Richiesta di attivazione inibitore
+    char input[1];
+    while (isInhibitorActive != 0 && isInhibitorActive != 1)
+    {
+        printf("Inserisci 1 per attivare l'inibitore, e 0 per bloccarlo\n");
+        scanf("%s", input);
+        //    fgets(input, sizeof(input), stdin);
+        sscanf(input, "%i", &isInhibitorActive);
+        if (isInhibitorActive != 0 && isInhibitorActive != 1)
+        {
+            printf("Non hai inserito un numero valido\n");
+        }
+    }
+
+
+    //Inizializzazione memoria condivisa statistiche
     statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
-    sharedMemoryId = getSharedMemoryId(0, sizeof(int)*10);
-    clearSharedMemory(sharedMemoryId);
+    statisticsSharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int) * 10);
+    clearSharedMemory(statisticsSharedMemoryId);
     unlockSemaphore(statisticsSemaphore);
+
+    //Inizializzazione memoria condivisa inibitore
+    inhibitorSemaphore = getSemaphore(INHIBITOR_SEMAPHORE);
+    inhibitorSharedMemoryId = getSharedMemoryId(INHIBITOR_SHARED_MEMORY, sizeof(int));
+    clearSharedMemory(inhibitorSharedMemoryId);
+    int* inhibitorMemory = getSharedMemory(inhibitorSharedMemoryId);
+    inhibitorMemory[0] = isInhibitorActive;
+    unlockSemaphore(inhibitorSemaphore);
+    setSignalAction(SIGINT, onActivateDeactivateInhibitor);
 
     //Inizializzazione ricezione messaggi tramite segnali
     signalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
@@ -77,20 +112,8 @@ int main() {
     unlockSemaphore(signalSemaphore);
 
 
-    //Richiesta di attivazione inibitore
-    char input[1];
-    int isInhibitorActive = -1;
-    while (isInhibitorActive != 0 && isInhibitorActive != 1)
-    {
-        printf("Inserisci 1 per attivare l'inibitore, e 0 per bloccarlo\n");
-        scanf("%s", input);
-    //    fgets(input, sizeof(input), stdin);
-        sscanf(input, "%i", &isInhibitorActive);
-        if (isInhibitorActive != 0 && isInhibitorActive != 1)
-        {
-            printf("Non hai inserito un numero valido\n");
-        }
-    }
+
+
 
     //Creazione processi ausiliari
     createSupply();
@@ -118,10 +141,18 @@ int main() {
     sendMessage(supplyPid, createMessage(1, "start"));
     sendMessage(activatorPid, createMessage(1, "start"));
     sendMessage(inhibitorPid, createMessage(1, "start"));
-
+/*
+    for (int i = 0; i < 10; i++)
+    {
+        sleepTime.tv_sec = 10;
+        printf("StartPause\n");
+        nanosleep(&sleepTime, &remaining);
+        printf("EndPause\n");
+    }*/
     while (SIM_DURATION > 0)
     {
-        sleep(1);
+        sleepTime.tv_sec = 1;
+        nanosleep(&sleepTime, &remaining);
         printStatistics();
         SIM_DURATION--;
     }
@@ -135,7 +166,7 @@ void printStatistics()
 {
     //Ottenimento accesso alla memoria condivisa
     waitAndLockSemaphore(statisticsSemaphore);
-    int* statistics = getSharedMemory(sharedMemoryId);
+    int* statistics = getSharedMemory(statisticsSharedMemoryId);
 
     //Stampa dati riguardanti le operazioni relative all'ultimo secondo
     printf("\n\nOperazioni nell'ultimo secondo:\n");
@@ -170,7 +201,7 @@ void printStatistics()
     printf("Terminazioni per MELTDOWNS evitate: %i\n", cumulativeStatistics[AVOIDED_MELTDOWNS]);
 
     //Reset memoria condivisa, controllo e prelievo ENERGY_DEMAND
-    clearSharedMemory(sharedMemoryId);
+    clearSharedMemory(statisticsSharedMemoryId);
     if (cumulativeStatistics[ENERGY_AMOUNT] >= ENERGY_DEMAND)
     {
         statistics[ENERGY_CONSUMED] += ENERGY_DEMAND;
@@ -188,19 +219,19 @@ void terminate(TerminationType reason)
 {
     if (reason == TIMEOUT)
     {
-        printf("Spegnimento programma... (TIMEOUT)");
+        printf("Spegnimento programma... (TIMEOUT)\n");
     }
     else if (reason == EXPLODE)
     {
-        printf("Spegnimento programma... (EXPLODE)");
+        printf("Spegnimento programma... (EXPLODE)\n");
     }
     else if (reason == BLACKOUT)
     {
-        printf("Spegnimento programma... (BLACKOUT)");
+        printf("Spegnimento programma... (BLACKOUT)\n");
     }
     else if (reason == MELTDOWN)
     {
-        printf("Spegnimento programma... (MELTDOWN)");
+        printf("Spegnimento programma... (MELTDOWN)\n");
     }
 
     //Terminazione atomi
@@ -220,10 +251,32 @@ void terminate(TerminationType reason)
     sendMessage(inhibitorPid, createMessage(1, "term"));
     killMessageChannel(inhibitorPid);
     killMessageChannel(getpid());
-    deleteSharedMemory(sharedMemoryId);
+    deleteSharedMemory(inhibitorSharedMemoryId);
+    deleteSharedMemory(statisticsSharedMemoryId);
     deleteSemaphore(signalSemaphore);
     deleteSemaphore(statisticsSemaphore);
     exit(0);
+}
+
+void onActivateDeactivateInhibitor(int sig)
+{
+    if (sig == SIGINT)
+    {
+        waitAndLockSemaphore(inhibitorSemaphore);
+        int* memory = getSharedMemory(inhibitorSharedMemoryId);
+        if (isInhibitorActive)
+        {
+            printf("\nInibitore disattivato!\n");
+        }
+        else
+        {
+            printf("\nInibitore attivato!\n");
+        }
+        isInhibitorActive = !isInhibitorActive;
+        *memory = isInhibitorActive;
+        unlockSemaphore(inhibitorSemaphore);
+        nanosleep(&remaining, &remaining);
+    }
 }
 
 void onReceiveMessage(int sig)
@@ -298,6 +351,7 @@ int createSupply()
         char* forkArgs[] = {NULL};
         char* forkEnv[] = {
                 stringJoin("N_NUOVI_ATOMI=", intToString(N_NUOVI_ATOMI)),
+                stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
                 stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX)),
                 stringJoin("STEP=", intToString(STEP)),
                 NULL};
@@ -325,8 +379,7 @@ int createActivator()
     {
         char* forkArgs[] = {NULL};
         char* forkEnv[] = {
-                stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
-                stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
+                stringJoin("STEP=", intToString(STEP)),
                 NULL};
         printf("Processo Attivatore creato correttamente\n");
         execve("./Activator", forkArgs, forkEnv);
@@ -339,7 +392,7 @@ int createActivator()
     return 0;
 }
 
-int createInhibitor(boolean active)
+int createInhibitor()
 {
     printf("Creazione processo Inibitore...\n");
     pid_t pid = fork();
@@ -351,7 +404,9 @@ int createInhibitor(boolean active)
     else if (pid == 0) //Processo Inibitore
     {
         char* forkArgs[] = {NULL};
-        char* forkEnv[] = {stringJoin("active=", intToString(active)), NULL};
+        char* forkEnv[] = {
+                stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
+                NULL};
         printf("Processo Inibitore creato correttamente\n");
         execve("./Inhibitor", forkArgs, forkEnv);
         printf("Errore Processo Inibitore\n");
@@ -370,14 +425,15 @@ int createAtom()
     if (atomPid == -1) //Errore di creazione della fork
     {
         printf("Errore durante la creazione del processo Atomo\n");
-        terminate(MELTDOWN);
         return -1;
     }
     else if (atomPid == 0) //Processo Atomo
     {
         char* forkArgs[] = {NULL};
         char* forkEnv[] = {
-                stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX)),
+                stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
+                stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
+                stringJoin("N_ATOMICO=", intToString(getRandomIntBetween(MIN_N_ATOMICO, N_ATOM_MAX))),
                 NULL};
         printf("Processo Atomo creato correttamente\n");
         execve("./Atom", forkArgs, forkEnv);

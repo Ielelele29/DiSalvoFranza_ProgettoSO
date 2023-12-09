@@ -20,3 +20,16 @@ void sendSignal(int pid, int signal)
         perror("Errore nell'invio del segnale");
     }
 }
+
+void ignoreSignal(int signal)
+{
+    sigset_t mask;
+    sigemptyset(&mask);
+
+    sigaddset(&mask, signal);
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
+    {
+        perror("Errore nella maschera del segnale");
+    }
+
+}

@@ -126,11 +126,12 @@ char* stringAfter(char* string, char* startReading)
     {
         if (stringStartsWith(string, startReading))
         {
+            string++;
             break;
         }
         string++;
     }
-    return stringCut(string+stringLength(startReading), 0, -1);
+    return stringCut(string, 0, -1);
 }
 
 char* stringBefore(char* input, char* endReading)
