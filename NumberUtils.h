@@ -11,4 +11,6 @@ int getRandomIntBetween(int min, int max);
 
 double floor(double num);
 
+int getAtomFunction(int N_ATOMICO,int N_ATOM_MAX);
+
 #endif //DISALVOFRANZA_PROGETTOSO_NUMBERUTILS_H

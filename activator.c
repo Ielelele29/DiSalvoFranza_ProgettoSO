@@ -9,13 +9,33 @@
 #include "SemaphoreUtils.h"
 #include "SignalUtils.h"
 #include <signal.h>
+#include "NodeUtils.h"
+#include <time.h>
+#include "NumberUtils.h"
 
-void printStatistics();
+void tick();
 void split();
-int MIN_N_ATOMICO = -1;
-int ENERGY_EXPLODE_THRESHOLD = -1;
+int STEP = -1;
+int indice = 0;
+extern char **environ;
 
 int main() {
+
+    ignoreSignal(SIGINT);
+
+    char** env = environ;
+    while (*env != NULL)
+    {
+        if(stringStartsWith(*env,"STEP="))
+        {
+            STEP = atoi(stringAfter(*env,"STEP="));
+        }
+        else
+        {
+            printf("Error wrong environ data");
+        }
+        *env++;
+    }
 
     int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
@@ -23,12 +43,12 @@ int main() {
     {
         if(msgrcv(msgId, &message, sizeof(message), 0, 0) != -1)
         {
-            if (message.messageType == 2)
+            /*if (message.messageType == 2)
             {
                 if(stringStartsWith(message.messageText,"MIN_N_ATOMICO="))
                 {
                     MIN_N_ATOMICO = atoi(stringAfter(message.messageText, "MIN_N_ATOMICO="));
-                    printStatistics();
+                    tick();
                     break;
                 }
                 else if(stringStartsWith(message.messageText,"ENERGY_EXPLODE_THRESHOLD="))
@@ -46,6 +66,25 @@ int main() {
             {
                 printf("Error invalid message!(invalid type of message)\n");
                 printf("Waiting for a new message...\n");
+            }*/
+            if (message.messageType == 1)
+            {
+                if(stringStartsWith(message.messageText,"start"))
+                {
+                    tick();
+                    break;
+                }
+                else
+                {
+                    printf("Error receiving message!\n");
+                    printf("Waiting for a new message...\n");
+                }
+
+            }
+            else
+            {
+                printf("Error receiving message!\n");
+                printf("Waiting for a new message...\n");
             }
         }
         else
@@ -58,8 +97,16 @@ int main() {
     return 0;
 }
 
+void waitNano()
+{
+    double nanoTime = STEP*(getRandom()+0.4);
+    struct timespec timeToSleep;
+    timeToSleep.tv_sec = (int)nanoTime/1000000000;
+    timeToSleep.tv_nsec = (int)nanoTime%1000000000;
+    nanosleep(&timeToSleep, NULL);
+}
 
-void printStatistics(){
+void tick(){
 
     int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
@@ -68,6 +115,7 @@ void printStatistics(){
     {
         if(msgrcv(msgId, &message, sizeof(message), 1, IPC_NOWAIT) == -1)
         {
+            waitNano();
             split();
         }
         else
@@ -79,6 +127,7 @@ void printStatistics(){
             }
             else
             {
+                waitNano();
                 split();
             }
 
@@ -88,16 +137,59 @@ void printStatistics(){
 
 void split()
 {
+    Atom atoms = NULL;
     // prelevo pid che mi servono;
     pid_t pidMaster = getppid();
+    pid_t pidActivator = getpid();
     int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     waitAndLockSemaphore(sem);
     sendMessage(pidMaster, createMessage(stringJoin("atomList=", intToString(getpid()))));
     sendSignal(pidMaster, SIGUSR1);
+    int msgId = getMessageId(getpid());
+    Message message = createEmptyMessage();
+
+    while(true)
+    {
+        if(msgrcv(msgId, &message, sizeof(message), 2, 0) == -1)
+        {
+            if(stringStartsWith(message.messageText,"atomPid="))
+            {
+                addNode(&atoms,atoi(stringAfter(message.messageText, "atomPid=")));
+            }
+            else if (stringEquals(message.messageText,"atomEnd"))
+            {
+                break;
+            }
+            else
+            {
+                printf("Error receiving message!\n");
+                printf("Waiting for a new message...\n");
+            }
+        }
+        else
+        {
+            printf("Error receiving message!\n");
+            printf("Waiting for a new message...\n");
+        }
+    }
 
 
-    sendMessage(atomoPid, createMessage(2,stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)));
-    sendMessage(atomoPid, createMessage(2,stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)));
-    sendMessage(atomoPid, createMessage(1,"split"););
+    int i = 0;
+
+    while(i < nodeSize(atoms))
+    {
+        if(i+indice%3 == 0)
+        {
+            sendMessage(atoms->value, createMessage(1,"split");
+        }
+        atoms = getNextNode(atoms);
+        i++;
+    }
+    indice = indice+i%3;
+
+
+    //sendMessage(atomoPid, createMessage(2,stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)));
+    //sendMessage(atomoPid, createMessage(2,stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)));
+
 
 }

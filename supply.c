@@ -13,15 +13,51 @@
 #include "SemaphoreUtils.h"
 #include "SignalUtils.h"
 #include <signal.h>
+#include "NumberUtils.h"
 
-void printStatistics();
+void tick();
 void createAtoms();
 void waitNano();
 int N_NUOVI_ATOMI= -1;
+int MIN_N_ATOMICO = -1;
 int STEP = -1;
 int N_ATOM_MAX= -1;
+int ENERGY_EXPLODE_THRESHOLD = -1;
+extern char **environ;
 
 int main() {
+
+    ignoreSignal(SIGINT);
+
+    char** env = environ;
+    while (*env != NULL)
+    {
+        if(stringStartsWith(*env,"N_NUOVI_ATOMI="))
+        {
+            N_NUOVI_ATOMI = atoi(stringAfter(*env,"N_NUOVI_ATOMI="));
+        }
+        else if(stringStartsWith(*env,"STEP="))
+        {
+            STEP = atoi(stringAfter(*env,"STEP="));
+        }
+        else if(stringStartsWith(*env,"ENERGY_EXPLODE_THRESHOLD="))
+        {
+            ENERGY_EXPLODE_THRESHOLD = atoi(stringAfter(*env,"ENERGY_EXPLODE_THRESHOLD="));
+        }
+        else if(stringStartsWith(*env,"N_ATOM_MAX="))
+        {
+            N_ATOM_MAX = atoi(stringAfter(*env,"N_ATOM_MAX="));
+        }
+        else if(stringStartsWith(*env,"MIN_N_ATOMICO="))
+        {
+            MIN_N_ATOMICO = atoi(stringAfter(*env,"MIN_N_ATOMICO="));
+        }
+        else
+        {
+            printf("Error wrong environ data");
+        }
+        *env++;
+    }
 
     int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
@@ -29,7 +65,7 @@ int main() {
     {
         if(msgrcv(msgId, &message, sizeof(message), 0, 0) != -1)
         {
-            if (message.messageType == 2)
+            /*if (message.messageType == 2)
             {
                 if(stringStartsWith(message.messageText,"N_NUOVI_ATOMI="))
                 {
@@ -38,7 +74,7 @@ int main() {
                 else if(stringStartsWith(message.messageText,"STEP="))
                 {
                     STEP = atoi(stringAfter(message.messageText,"STEP="));
-                    printStatistics();
+                    tick();
                     break;
                 }
                 else if(stringStartsWith(message.messageText,"N_ATOM_MAX="))
@@ -56,6 +92,24 @@ int main() {
             {
                 printf("Error invalid message!(invalid type of message)\n");
                 printf("Waiting for a new message...\n");
+            }*/
+            if (message.messageType == 1)
+            {
+                if(stringStartsWith(message.messageText,"start"))
+                {
+                    tick();
+                    break;
+                }
+                else
+                {
+                    printf("Error receiving message!\n");
+                    printf("Waiting for a new message...\n");
+                }
+            }
+            else
+            {
+                printf("Error invalid message!\n");
+                printf("Waiting for a new message...\n");
             }
         }
         else
@@ -68,7 +122,7 @@ int main() {
     return 0;
 }
 
-void printStatistics(){
+void tick(){
 
     int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
@@ -121,15 +175,22 @@ void createAtoms()
         }
         else if (atomPid == 0)
         {
+            int N_ATOMICO = getRandomIntBetween(MIN_N_ATOMICO, N_ATOM_MAX);
             char *forkArgs[] = {NULL};
-            char *forkEnv[] = {NULL};
+            char* forkEnv[] = {
+                    stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
+                    stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
+                    stringJoin("N_ATOMICO=", intToString(N_ATOMICO)),
+                    stringJoin("N_FUNCTION=",intToString(getAtomFunction(N_ATOMICO,N_ATOM_MAX))),
+                    stringJoin("PID_MASTER=",intToString(getppid())),
+                    NULL};
             printf("Creo il %d° processo atomo con supply\n", i+1);
             execve("./Atom", forkArgs, forkEnv);
             printf("Errore Processo Atomo\n");
             return;
         }
         int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
-        sendMessage(atomPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
+        //sendMessage(atomPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
         waitAndLockSemaphore(sem);
         sendMessage(pidMaster, createMessage(2, stringJoin("atomCreate=", intToString(atomPid))));
         i++;

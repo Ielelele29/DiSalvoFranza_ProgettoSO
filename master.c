@@ -319,6 +319,7 @@ void onReceiveMessage(int sig)
                     if (toDelete != NULL)
                     {
                         removeNode(toDelete);
+                        killMessageChannel(processPid);
                     }
                 }
                 else if (stringEquals(request, "atomCreate"))
@@ -429,11 +430,14 @@ int createAtom()
     }
     else if (atomPid == 0) //Processo Atomo
     {
+        int N_ATOMICO = getRandomIntBetween(MIN_N_ATOMICO, N_ATOM_MAX);
         char* forkArgs[] = {NULL};
         char* forkEnv[] = {
                 stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
                 stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
-                stringJoin("N_ATOMICO=", intToString(getRandomIntBetween(MIN_N_ATOMICO, N_ATOM_MAX))),
+                stringJoin("N_ATOMICO=", intToString(N_ATOMICO)),
+                stringJoin("N_FUNCTION=",intToString(getAtomFunction(N_ATOMICO,N_ATOM_MAX))),
+                stringJoin("PID_MASTER=",intToString(getpid())),
                 NULL};
         printf("Processo Atomo creato correttamente\n");
         execve("./Atom", forkArgs, forkEnv);

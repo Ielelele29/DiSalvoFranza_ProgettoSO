@@ -46,3 +46,19 @@ double floor(double num)
     }
     return integerPart;
 }
+
+int getAtomFunction(int N_ATOMICO,int N_ATOM_MAX)
+{
+    if(N_ATOMICO <= N_ATOM_MAX*0.2)
+    {
+        return 0;
+    }
+    else if (N_ATOMICO <= N_ATOM_MAX*0.6) //N_ATOMICO > N_ATOM_MAX*0.2 (implicit)
+    {
+        return 1;
+    }
+    else
+    {
+        return 2;
+    }
+}
