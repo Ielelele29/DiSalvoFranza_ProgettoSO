@@ -144,7 +144,7 @@ void split()
     pid_t pidActivator = getpid();
     int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     waitAndLockSemaphore(sem);
-    sendMessage(pidMaster, createMessage(stringJoin("atomList=", intToString(getpid()))));
+    sendMessage(pidMaster, createMessage(2,stringJoin("atomList=", intToString(getpid()))));
     sendSignal(pidMaster, SIGUSR1);
     int msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
@@ -181,7 +181,7 @@ void split()
     {
         if(i+indice%3 == 0)
         {
-            sendMessage(atoms->value, createMessage(1,"split");
+            sendMessage(atoms->value, createMessage(1,"split"));
             int sharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*10);
             int statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
             waitAndLockSemaphore(statisticsSemaphore);

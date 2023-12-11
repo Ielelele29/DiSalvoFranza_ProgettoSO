@@ -149,8 +149,6 @@ int main() {
         }
     }
 
-
-
     return 0;
 }
 
@@ -267,7 +265,6 @@ void createAtom(int childAtomicNumber, int energy)
                 stringJoin("PID_MASTER=",intToString(getppid())),
                 stringJoin("N_ATOM_MAX=",intToString(N_ATOM_MAX)),
                 NULL};
-        printf("Creo il %d° processo atomo con supply\n", i+1);
         execve("./Atom", forkArgs, forkEnv);
         printf("Errore Processo Atomo\n");
         return;
