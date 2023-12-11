@@ -12,6 +12,7 @@
 #include "NodeUtils.h"
 #include <time.h>
 #include "NumberUtils.h"
+#include "SharedMemoryUtils.h"
 
 void tick();
 void split();
@@ -181,7 +182,12 @@ void split()
         if(i+indice%3 == 0)
         {
             sendMessage(atoms->value, createMessage(1,"split");
-            //TODO incrementa ACTIVATION_AMOUNT
+            int sharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*10);
+            int statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
+            waitAndLockSemaphore(statisticsSemaphore);
+            int* statistics = getSharedMemory(sharedMemoryId);
+            statistics[ACTIVATION_AMOUNT]++;
+            unlockSemaphore(statisticsSemaphore);
         }
         atoms = getNextNode(atoms);
         i++;
