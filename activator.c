@@ -181,6 +181,7 @@ void split()
         if(i+indice%3 == 0)
         {
             sendMessage(atoms->value, createMessage(1,"split");
+            //TODO incrementa ACTIVATION_AMOUNT
         }
         atoms = getNextNode(atoms);
         i++;

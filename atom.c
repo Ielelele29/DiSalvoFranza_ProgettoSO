@@ -15,17 +15,23 @@
 #include "SignalUtils.h"
 #include <signal.h>
 #include "NumberUtils.h"
+#include "SignalUtils.h"
+
 
 
 int MIN_N_ATOMICO = -1;
 boolean isActive();
 void split();
+void createAtom();
+void setAtomFunction();
 int N_ATOMICO = -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
+int N_ATOM_MAX = -1;
 int sharedMemoryId = -1;
 int statisticsSemaphore = -1;
 int inhibitorSharedMemoryId = -1;
 int inhibitorSemaphore = -1;
+int PID_INHIBITOR = -1;
 int (*atomSplitFunction)(int,int);
 int atomSplitFunction0(int,int);
 int atomSplitFunction1(int,int);
@@ -63,25 +69,17 @@ int main() {
         {
             MIN_N_ATOMICO = atoi(stringAfter(*env,"MIN_N_ATOMICO="));
         }
+        else if(stringStartsWith(*env,"PID_INHIBITOR="))
+        {
+            PID_INHIBITOR = atoi(stringAfter(*env,"PID_INHIBITOR="));
+        }
         else if(stringStartsWith(*env,"PID_MASTER="))
         {
             PID_MASTER = atoi(stringAfter(*env,"PID_MASTER="));
         }
-        else if(stringStartsWith(*env,"N_FUNCTION="))
+        else if(stringStartsWith(*env,"N_ATOM_MAX="))
         {
-            int N_FUNCTION = atoi(stringAfter(*env,"N_FUNCTION="));
-            if (N_FUNCTION == 0)
-            {
-                atomSplitFunction = &atomSplitFunction0;
-            }
-            else if(N_FUNCTION == 1)
-            {
-                atomSplitFunction = &atomSplitFunction1;
-            }
-            else
-            {
-                atomSplitFunction = &atomSplitFunction2;
-            }
+            N_ATOM_MAX = atoi(stringAfter(*env,"N_ATOM_MAX="));
         }
         else
         {
@@ -91,7 +89,8 @@ int main() {
         *env++;
     }
 
-    int i = 0;
+    setAtomFunction();
+
     Message message = createEmptyMessage();
     while(true)
     {
@@ -162,10 +161,11 @@ void split()
         /* effettuare scissione*/
         int childAtomicNumber = getRandomIntBetween(MIN_N_ATOMICO,N_ATOMICO);
         N_ATOMICO -= childAtomicNumber;
+        setAtomFunction();
         int energy = atomSplitFunction(N_ATOMICO,childAtomicNumber);
         if(isActive())
         {
-            sendMessage(getpid(),createMessage(2,stringJoin(intToString(getpid()),stringJoin(";SPLIT_ENERGY_PRODUCED=",intToString(energy)))));
+            sendMessage(PID_INHIBITOR,createMessage(2,stringJoin(intToString(getpid()),stringJoin(";SPLIT_ENERGY_PRODUCED=",intToString(energy)))));
             Message message = createEmptyMessage();
             if(msgrcv(msgId, &message, sizeof(message), 2, 0) != -1)
             {
@@ -224,3 +224,92 @@ boolean isActive()
     return isActive;
 }
 
+void createAtom(int childAtomicNumber, int energy)
+{
+    int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
+    pid_t atomPid = fork();
+    if (atomPid == -1)
+    {
+        printf("Errore durante la creazione del processo Atomo\n");
+        if(isActive())
+        {
+            sendMessage(PID_INHIBITOR,createMessage(2,stringJoin(intToString(getpid()),";MELTDOWN")));
+            Message message = createEmptyMessage();
+            if(msgrcv(msgId, &message, sizeof(message), 2, 0) != -1)
+            {
+                if(stringEquals(message.messageText,"1"))
+                {
+                    waitAndLockSemaphore(sem);
+                    sendMessage(PID_MASTER, createMessage(1, "MELTDOWN"));
+                    sendSignal(PID_MASTER, SIGUSR1);
+                }
+            }
+            else
+            {
+                printf("Error receiving message!\n");
+                printf("Waiting for a new message...\n");
+            }
+        }
+        else
+        {
+            waitAndLockSemaphore(sem);
+            sendMessage(PID_MASTER, createMessage(1, "MELTDOWN"));
+            sendSignal(PID_MASTER, SIGUSR1);
+        }
+    }
+    else if (atomPid == 0)
+    {
+        char *forkArgs[] = {NULL};
+        char* forkEnv[] = {
+                stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
+                stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
+                stringJoin("N_ATOMICO=", intToString(childAtomicNumber)),
+                stringJoin("PID_MASTER=",intToString(getppid())),
+                stringJoin("N_ATOM_MAX=",intToString(N_ATOM_MAX)),
+                NULL};
+        printf("Creo il %d° processo atomo con supply\n", i+1);
+        execve("./Atom", forkArgs, forkEnv);
+        printf("Errore Processo Atomo\n");
+        return;
+    }
+
+    //sendMessage(atomPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
+    waitAndLockSemaphore(sem);
+    sendMessage(PID_MASTER, createMessage(2, stringJoin("atomCreate=", intToString(atomPid))));
+    sendSignal(PID_MASTER, SIGUSR1);
+
+
+    waitAndLockSemaphore(statisticsSemaphore);
+    int* statistics = getSharedMemory(sharedMemoryId);
+    statistics[SPLIT_AMOUNT]++;
+    statistics[ENERGY_AMOUNT] += energy;
+    statistics[ENERGY_PRODUCED] += energy;
+    boolean explode = statistics[ENERGY_AMOUNT] > ENERGY_EXPLODE_THRESHOLD;
+    unlockSemaphore(statisticsSemaphore);
+
+    if (explode)
+    {
+        waitAndLockSemaphore(sem);
+        sendMessage(PID_MASTER, createMessage(1, "EXPLODE"));
+        sendSignal(PID_MASTER, SIGUSR1);
+    }
+
+}
+
+void setAtomFunction()
+{
+    int N_FUNCTION = getAtomFunction(N_ATOMICO,N_ATOM_MAX);
+
+    if (N_FUNCTION == 0)
+    {
+        atomSplitFunction = &atomSplitFunction0;
+    }
+    else if(N_FUNCTION == 1)
+    {
+        atomSplitFunction = &atomSplitFunction1;
+    }
+    else
+    {
+        atomSplitFunction = &atomSplitFunction2;
+    }
+}

@@ -23,6 +23,7 @@ int MIN_N_ATOMICO = -1;
 int STEP = -1;
 int N_ATOM_MAX= -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
+int PID_INHIBITOR = -1;
 extern char **environ;
 
 int main() {
@@ -39,6 +40,10 @@ int main() {
         else if(stringStartsWith(*env,"STEP="))
         {
             STEP = atoi(stringAfter(*env,"STEP="));
+        }
+        else if(stringStartsWith(*env,"PID_INHIBITOR="))
+        {
+            PID_INHIBITOR = atoi(stringAfter(*env,"PID_INHIBITOR="));
         }
         else if(stringStartsWith(*env,"ENERGY_EXPLODE_THRESHOLD="))
         {
@@ -181,8 +186,9 @@ void createAtoms()
                     stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
                     stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
                     stringJoin("N_ATOMICO=", intToString(N_ATOMICO)),
-                    stringJoin("N_FUNCTION=",intToString(getAtomFunction(N_ATOMICO,N_ATOM_MAX))),
                     stringJoin("PID_MASTER=",intToString(getppid())),
+                    stringJoin("N_ATOM_MAX=",intToString(N_ATOM_MAX)),
+                    stringJoin("PID_INHIBITOR=", intToString(PID_INHIBITOR)),
                     NULL};
             printf("Creo il %d° processo atomo con supply\n", i+1);
             execve("./Atom", forkArgs, forkEnv);

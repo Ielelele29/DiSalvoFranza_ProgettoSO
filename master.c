@@ -116,9 +116,10 @@ int main() {
 
 
     //Creazione processi ausiliari
+    createInhibitor(isInhibitorActive);
     createSupply();
     createActivator();
-    createInhibitor(isInhibitorActive);
+
 
     for (int i = 0; i < N_ATOMI_INIT; i++)
     {
@@ -355,6 +356,7 @@ int createSupply()
                 stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
                 stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX)),
                 stringJoin("STEP=", intToString(STEP)),
+                stringJoin("PID_INHIBITOR=", intToString(inhibitorPid)),
                 NULL};
         printf("Processo Alimentazione creato correttamente\n");
         execve("./Supply", forkArgs, forkEnv);
@@ -436,8 +438,9 @@ int createAtom()
                 stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
                 stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
                 stringJoin("N_ATOMICO=", intToString(N_ATOMICO)),
-                stringJoin("N_FUNCTION=",intToString(getAtomFunction(N_ATOMICO,N_ATOM_MAX))),
                 stringJoin("PID_MASTER=",intToString(getpid())),
+                stringJoin("N_ATOM_MAX=",intToString(N_ATOM_MAX)),
+                stringJoin("PID_INHIBITOR=", intToString(inhibitorPid)),
                 NULL};
         printf("Processo Atomo creato correttamente\n");
         execve("./Atom", forkArgs, forkEnv);
