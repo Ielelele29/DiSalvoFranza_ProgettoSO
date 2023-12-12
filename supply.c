@@ -24,38 +24,41 @@ int STEP = -1;
 int N_ATOM_MAX= -1;
 int ENERGY_EXPLODE_THRESHOLD = -1;
 int PID_INHIBITOR = -1;
+int sem = -1;
+int msgId = -1;
 extern char **environ;
 
 int main() {
 
     ignoreSignal(SIGINT);
+    sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
 
     char** env = environ;
     while (*env != NULL)
     {
         if(stringStartsWith(*env,"N_NUOVI_ATOMI="))
         {
-            N_NUOVI_ATOMI = atoi(stringAfter(*env,"N_NUOVI_ATOMI="));
+            N_NUOVI_ATOMI = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"STEP="))
         {
-            STEP = atoi(stringAfter(*env,"STEP="));
+            STEP = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"PID_INHIBITOR="))
         {
-            PID_INHIBITOR = atoi(stringAfter(*env,"PID_INHIBITOR="));
+            PID_INHIBITOR = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"ENERGY_EXPLODE_THRESHOLD="))
         {
-            ENERGY_EXPLODE_THRESHOLD = atoi(stringAfter(*env,"ENERGY_EXPLODE_THRESHOLD="));
+            ENERGY_EXPLODE_THRESHOLD = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"N_ATOM_MAX="))
         {
-            N_ATOM_MAX = atoi(stringAfter(*env,"N_ATOM_MAX="));
+            N_ATOM_MAX = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"MIN_N_ATOMICO="))
         {
-            MIN_N_ATOMICO = atoi(stringAfter(*env,"MIN_N_ATOMICO="));
+            MIN_N_ATOMICO = atoi(stringAfter(*env,"="));
         }
         else
         {
@@ -64,12 +67,13 @@ int main() {
         *env++;
     }
 
-    int msgId = getMessageId(getpid());
-    Message message = createEmptyMessage();
+    msgId = getMessageId(getpid());
     while(true)
     {
+        Message message = createEmptyMessage();
         if(msgrcv(msgId, &message, sizeof(message), 0, 0) != -1)
         {
+            printf("Messagione supply %s \n", message.messageText);
             /*if (message.messageType == 2)
             {
                 if(stringStartsWith(message.messageText,"N_NUOVI_ATOMI="))
@@ -109,18 +113,21 @@ int main() {
                 {
                     printf("Error receiving message!\n");
                     printf("Waiting for a new message...\n");
+                    printf("tricheco1\n");
                 }
             }
             else
             {
                 printf("Error invalid message!\n");
                 printf("Waiting for a new message...\n");
+                printf("tricheco2\n");
             }
         }
         else
         {
             printf("Error receiving message!\n");
             printf("Waiting for a new message...\n");
+            printf("tricheco3\n");
         }
     }
 
@@ -129,11 +136,11 @@ int main() {
 
 void tick(){
 
-    int msgId = getMessageId(getpid());
-    Message message = createEmptyMessage();
+    msgId = getMessageId(getpid());
 
     while(true)
     {
+        Message message = createEmptyMessage();
         if(msgrcv(msgId, &message, sizeof(message), 1, IPC_NOWAIT) == -1)
         {
             waitNano();
@@ -195,7 +202,7 @@ void createAtoms()
             printf("Errore Processo Atomo\n");
             return;
         }
-        int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
+
         //sendMessage(atomPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
         waitAndLockSemaphore(sem);
         sendMessage(pidMaster, createMessage(2, stringJoin("atomCreate=", intToString(atomPid))));

@@ -61,7 +61,9 @@ int createAtom();
 
 int main() {
     printf("Hello, World 4!\n");
+    printf("pidMaster secondo masterato1spazio %i\n", getpid());
     //Lettura configurazione
+
     readConfig();
 
 
@@ -235,6 +237,7 @@ void terminate(TerminationType reason)
         printf("Spegnimento programma... (MELTDOWN)\n");
     }
 
+    sleep(5);
     //Terminazione atomi
     while (atoms != NULL)
     {

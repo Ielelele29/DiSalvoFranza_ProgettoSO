@@ -38,6 +38,7 @@ int atomSplitFunction1(int,int);
 int atomSplitFunction2(int,int);
 int PID_MASTER = -1;
 int msgId = -1;
+int sem = -1;
 extern char **environ;
 
 int main() {
@@ -47,6 +48,7 @@ int main() {
     statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
     inhibitorSemaphore = getSemaphore(INHIBITOR_SEMAPHORE);
     inhibitorSharedMemoryId = getSharedMemoryId(INHIBITOR_SHARED_MEMORY, sizeof(int));
+    sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
 
     waitAndLockSemaphore(statisticsSemaphore);
     int* statistics = getSharedMemory(sharedMemoryId);
@@ -59,27 +61,27 @@ int main() {
     {
         if(stringStartsWith(*env,"N_ATOMICO="))
         {
-            N_ATOMICO = atoi(stringAfter(*env,"N_ATOMICO="));
+            N_ATOMICO = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"ENERGY_EXPLODE_THRESHOLD="))
         {
-            ENERGY_EXPLODE_THRESHOLD = atoi(stringAfter(*env,"ENERGY_EXPLODE_THRESHOLD="));
+            ENERGY_EXPLODE_THRESHOLD = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"MIN_N_ATOMICO="))
         {
-            MIN_N_ATOMICO = atoi(stringAfter(*env,"MIN_N_ATOMICO="));
+            MIN_N_ATOMICO = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"PID_INHIBITOR="))
         {
-            PID_INHIBITOR = atoi(stringAfter(*env,"PID_INHIBITOR="));
+            PID_INHIBITOR = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"PID_MASTER="))
         {
-            PID_MASTER = atoi(stringAfter(*env,"PID_MASTER="));
+            PID_MASTER = atoi(stringAfter(*env,"="));
         }
         else if(stringStartsWith(*env,"N_ATOM_MAX="))
         {
-            N_ATOM_MAX = atoi(stringAfter(*env,"N_ATOM_MAX="));
+            N_ATOM_MAX = atoi(stringAfter(*env,"="));
         }
         else
         {
@@ -91,11 +93,12 @@ int main() {
 
     setAtomFunction();
 
-    Message message = createEmptyMessage();
     while(true)
     {
+        Message message = createEmptyMessage();
         if(msgrcv(msgId, &message, sizeof(message), 0, 0) != -1)
         {
+            printf("MESSAGGIONE = %s\n", message.messageText);
             /*if (message.messageType == 2)
             {
                 if(stringStartsWith(message.messageText,"N_ATOM_MAX="))
@@ -133,6 +136,7 @@ int main() {
                 {
                     printf("Error invalid message!\n");
                     printf("Waiting for a new message...\n");
+                    printf("francodicicco1\n");
                 }
 
             }
@@ -140,12 +144,14 @@ int main() {
             {
                 printf("Error invalid message!\n");
                 printf("Waiting for a new message...\n");
+                printf("francodicicco2\n");
             }
         }
         else
         {
             printf("Error receiving message!\n");
             printf("Waiting for a new message...\n");
+            printf("francodicicco3\n");
         }
     }
 
@@ -169,7 +175,7 @@ void split()
             {
                 if(stringEquals(message.messageText,"1"))
                 {
-
+                    createAtom(childAtomicNumber,energy);
                 }
                 else
                 {
@@ -180,12 +186,13 @@ void split()
             {
                 printf("Error receiving message!\n");
                 printf("Waiting for a new message...\n");
+                printf("errore split assurdosplit\n");
             }
 
         }
         else
         {
-
+            createAtom(childAtomicNumber,energy);
         }
 
     }
@@ -224,7 +231,6 @@ boolean isActive()
 
 void createAtom(int childAtomicNumber, int energy)
 {
-    int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     pid_t atomPid = fork();
     if (atomPid == -1)
     {
@@ -246,6 +252,7 @@ void createAtom(int childAtomicNumber, int energy)
             {
                 printf("Error receiving message!\n");
                 printf("Waiting for a new message...\n");
+                printf("firifillo1\n");
             }
         }
         else

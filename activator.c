@@ -18,18 +18,25 @@ void tick();
 void split();
 int STEP = -1;
 int indice = 0;
+int msgId = -1;
+int sharedMemoryId = -1;
+int statisticsSemaphore = -1;
+int sem = -1;
 extern char **environ;
 
 int main() {
 
     ignoreSignal(SIGINT);
+    sharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*10);
+    statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
+    sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
 
     char** env = environ;
     while (*env != NULL)
     {
         if(stringStartsWith(*env,"STEP="))
         {
-            STEP = atoi(stringAfter(*env,"STEP="));
+            STEP = atoi(stringAfter(*env,"="));
         }
         else
         {
@@ -38,7 +45,7 @@ int main() {
         *env++;
     }
 
-    int msgId = getMessageId(getpid());
+    msgId = getMessageId(getpid());
     Message message = createEmptyMessage();
     while(true)
     {
@@ -79,6 +86,7 @@ int main() {
                 {
                     printf("Error receiving message!\n");
                     printf("Waiting for a new message...\n");
+                    printf("CuloAllegro1\n");
                 }
 
             }
@@ -86,12 +94,14 @@ int main() {
             {
                 printf("Error receiving message!\n");
                 printf("Waiting for a new message...\n");
+                printf("CuloAllegro2\n");
             }
         }
         else
         {
             printf("Error receiving message!\n");
             printf("Waiting for a new message...\n");
+            printf("CuloAllegro3\n");
         }
     }
 
@@ -109,11 +119,11 @@ void waitNano()
 
 void tick(){
 
-    int msgId = getMessageId(getpid());
-    Message message = createEmptyMessage();
+    msgId = getMessageId(getpid());
 
     while(true)
     {
+        Message message = createEmptyMessage();
         if(msgrcv(msgId, &message, sizeof(message), 1, IPC_NOWAIT) == -1)
         {
             waitNano();
@@ -142,20 +152,19 @@ void split()
     // prelevo pid che mi servono;
     pid_t pidMaster = getppid();
     pid_t pidActivator = getpid();
-    int sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
     waitAndLockSemaphore(sem);
     sendMessage(pidMaster, createMessage(2,stringJoin("atomList=", intToString(getpid()))));
     sendSignal(pidMaster, SIGUSR1);
-    int msgId = getMessageId(getpid());
-    Message message = createEmptyMessage();
-
+    msgId = getMessageId(pidMaster);
+    printf("pidMaster secondo activator %i\n", pidMaster);
     while(true)
     {
+        Message message = createEmptyMessage();
         if(msgrcv(msgId, &message, sizeof(message), 2, 0) == -1)
         {
             if(stringStartsWith(message.messageText,"atomPid="))
             {
-                addNode(&atoms,atoi(stringAfter(message.messageText, "atomPid=")));
+                addNode(&atoms,atoi(stringAfter(message.messageText, "=")));
             }
             else if (stringEquals(message.messageText,"atomEnd"))
             {
@@ -165,12 +174,14 @@ void split()
             {
                 printf("Error receiving message!\n");
                 printf("Waiting for a new message...\n");
+                printf("CuloAllegroDiverso1\n");
             }
         }
         else
         {
             printf("Error receiving message!\n");
             printf("Waiting for a new message...\n");
+            printf("CuloAllegroDiverso2\n");
         }
     }
 
@@ -182,8 +193,6 @@ void split()
         if(i+indice%3 == 0)
         {
             sendMessage(atoms->value, createMessage(1,"split"));
-            int sharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*10);
-            int statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
             waitAndLockSemaphore(statisticsSemaphore);
             int* statistics = getSharedMemory(sharedMemoryId);
             statistics[ACTIVATION_AMOUNT]++;

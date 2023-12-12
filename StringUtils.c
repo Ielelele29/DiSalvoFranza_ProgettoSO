@@ -126,7 +126,7 @@ char* stringAfter(char* string, char* startReading)
     {
         if (stringStartsWith(string, startReading))
         {
-            string++;
+            string += stringLength(startReading);
             break;
         }
         string++;
