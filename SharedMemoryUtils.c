@@ -27,7 +27,8 @@ void* getSharedMemory(int sharedMemoryId)
 int getSharedMemorySize(int sharedMemoryId)
 {
     struct shmid_ds sharedMemoryInfo;
-    if (shmctl(sharedMemoryId, IPC_STAT, &sharedMemoryInfo) == -1) {
+    if (shmctl(sharedMemoryId, IPC_STAT, &sharedMemoryInfo) == -1)
+    {
         perror("shmctl (IPC_STAT)");
         return -1;
     }

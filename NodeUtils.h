@@ -30,4 +30,6 @@ Node* searchNodeValue(Node* node, int value);
 
 int nodeSize(Node* node);
 
+void printValues(Node* node);
+
 #endif //DISALVOFRANZA_PROGETTOSO_NODEUTILS_H

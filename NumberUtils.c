@@ -47,7 +47,7 @@ double floor(double num)
     return integerPart;
 }
 
-int getAtomFunction(int N_ATOMICO,int N_ATOM_MAX)
+int getAtomFunction(int N_ATOMICO, int N_ATOM_MAX)
 {
     if(N_ATOMICO <= N_ATOM_MAX*0.2)
     {
@@ -61,4 +61,9 @@ int getAtomFunction(int N_ATOMICO,int N_ATOM_MAX)
     {
         return 2;
     }
+}
+
+int max(int num1, int num2)
+{
+    return num1 > num2 ? num1 : num2;
 }

@@ -2,7 +2,6 @@
 #include "CustomTypes.h"
 #include <unistd.h>
 #include <time.h>
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -16,11 +15,270 @@
 #include <signal.h>
 #include "NumberUtils.h"
 #include "SignalUtils.h"
+#include "ConfigUtils.h"
+
+//Pid processi
+int masterPid = -1;
+int atomPid = -1;
+
+//Code di messaggi
+int atomMessageChannelId = -1;
+
+//Memoria condivisa
+int statisticsSharedMemoryId = -1;
+
+//Semafori
+int statisticsSemaphoreId = -1;
+
+int atomicNumber = -1;
+int minAtomicNumber = -1;
+int energyExplodeThreshold = -1;
+
+extern char** environ;
+
+void listenMessages();
+boolean split();
+int getSplitEnergy(int firstAtomicNumber, int secondAtomicNumber);
+
+int main()
+{
+    ignoreSignal(SIGINT);
+
+    char** env = environ;
+    while (*env != NULL)
+    {
+        if (stringStartsWith(*env,"MasterPid="))
+        {
+            masterPid = atoi(stringAfter(*env,"="));
+        }
+        else if (stringStartsWith(*env,"AtomicNumber="))
+        {
+            atomicNumber = atoi(stringAfter(*env,"="));
+        }
+        env++;
+    }
+
+    //Pid processi
+    atomPid = getpid();
+
+    //Code di messaggi
+    atomMessageChannelId = getMessageId(atomPid);
+
+    //Semafori
+    statisticsSemaphoreId = getSemaphore(STATISTICS_SEMAPHORE);
+
+    //Memoria condivisa
+    statisticsSharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*11);
+
+    //Config
+    minAtomicNumber = getConfigValue(MIN_N_ATOMICO);
+    energyExplodeThreshold = getConfigValue(ENERGY_EXPLODE_THRESHOLD);
+
+    waitAndLockSemaphore(statisticsSemaphoreId);
+    int* statistics = getSharedMemory(statisticsSharedMemoryId);
+    statistics[CREATED_ATOMS]++;
+    unlockSemaphore(statisticsSemaphoreId);
+
+    sendMessage(masterPid, createMessage(2, stringJoin("AtomCreate=", intToString(atomPid))));
+    listenMessages();
+
+    killMessageChannel(atomPid);
+    printf("END ATOM\n");
+    return 0;
+}
+
+
+void listenMessages()
+{
+    Message message = createEmptyMessage();
+    int result = msgrcv(atomMessageChannelId, &message, sizeof(message), 1, 0);
+    if (result != -1)
+    {
+        if (message.messageType == 1)
+        {
+            if (stringEquals(message.messageText, "Stop"))
+            {
+                return;
+            }
+            else if (stringEquals(message.messageText, "Split"))
+            {
+                if (split())
+                {
+                    return;
+                }
+            }
+        }
+    }
+    listenMessages();
+}
+
+boolean split()
+{
+    printf("[Atom] Splitting with atomic number = %i\n", atomicNumber);
+    if (atomicNumber > minAtomicNumber)
+    {
+        // effettuare scissione
+        int childAtomicNumber = getRandomIntBetween(minAtomicNumber, atomicNumber);
+        printf("[Atom] Child atomic number = %i\n", childAtomicNumber);
+        atomicNumber -= childAtomicNumber;
+        int energy = getSplitEnergy(atomicNumber, childAtomicNumber);
+        sendMessage(masterPid, createMessage(3, stringJoin(intToString(atomPid), stringJoin(";AtomSplit=", intToString(energy)))));
+        Message message = createEmptyMessage();
+        int result = msgrcv(atomMessageChannelId, &message, sizeof(message), 4, 0);
+        if (result != -1)
+        {
+            boolean canCreate = stringEquals(message.messageText, "1") ? true : false;
+            if (canCreate)
+            {
+                pid_t childAtomPid = fork();
+                if (childAtomPid == -1)
+                {
+                    printf("Errore durante la creazione del processo Atomo\n");
+                    sendMessage(masterPid, createMessage(1, "Meltdown"));
+                    return false;
+                }
+                else if (childAtomPid == 0)
+                {
+                    char* forkArgs[] = {NULL};
+                    char* forkEnv[] = {
+                            stringJoin("AtomicNumber=", intToString(childAtomicNumber)),
+                            stringJoin("MasterPid=", intToString(masterPid)),
+                            NULL};
+                    execve("./Atom", forkArgs, forkEnv);
+                    printf("Errore Processo Atomo\n");
+                    return false;
+                }
+                int finalEnergy = energy;
+                sendMessage(masterPid, createMessage(3, stringJoin(intToString(atomPid), stringJoin(";AtomEnergy=", intToString(energy)))));
+                message = createEmptyMessage();
+                result = msgrcv(atomMessageChannelId, &message, sizeof(message), 2, 0);
+                if (result != -1)
+                {
+                    char* key = stringBefore(message.messageText, "=");
+                    char* value = stringAfter(message.messageText, "=");
+                    if (stringEquals(key, "AtomEnergy"))
+                    {
+                        finalEnergy = atoi(value);
+                    }
+                }
+                waitAndLockSemaphore(statisticsSemaphoreId);
+                int* statistics = getSharedMemory(statisticsSharedMemoryId);
+                statistics[SPLIT_AMOUNT]++;
+                statistics[ABSORBED_ENERGY] += finalEnergy - energy;
+                statistics[ENERGY_AMOUNT] += finalEnergy;
+                statistics[ENERGY_PRODUCED] += finalEnergy;
+                if (statistics[ENERGY_AMOUNT] > energyExplodeThreshold)
+                {
+                    sendMessage(masterPid, createMessage(1, "Explode"));
+                }
+                unlockSemaphore(statisticsSemaphoreId);
+                return false;
+            }
+        }
+    }
+    else
+    {
+        waitAndLockSemaphore(statisticsSemaphoreId);
+        int* statistics = getSharedMemory(statisticsSharedMemoryId);
+        statistics[DEAD_ATOMS]++;
+        unlockSemaphore(statisticsSemaphoreId);
+        sendMessage(masterPid, createMessage(2, stringJoin("AtomDie=", intToString(atomPid))));
+        return true;
+    }
+}
+
+int getSplitEnergy(int firstAtomicNumber, int secondAtomicNumber)
+{
+    return firstAtomicNumber * secondAtomicNumber - max(firstAtomicNumber, secondAtomicNumber);
+}
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 int MIN_N_ATOMICO = -1;
 boolean isActive();
+boolean isTerminating();
 void split();
 void createAtom();
 void setAtomFunction();
@@ -37,24 +295,17 @@ int atomSplitFunction0(int,int);
 int atomSplitFunction1(int,int);
 int atomSplitFunction2(int,int);
 int PID_MASTER = -1;
-int msgId = -1;
-int sem = -1;
+int messageChannelId = -1;
+int masterSignalSemaphore = -1;
 extern char **environ;
 
 int main() {
-
+    if (isTerminating())
+    {
+        printf("STOP ATOM\n\n");
+        return 0;
+    }
     ignoreSignal(SIGINT);
-    sharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*10);
-    statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
-    inhibitorSemaphore = getSemaphore(INHIBITOR_SEMAPHORE);
-    inhibitorSharedMemoryId = getSharedMemoryId(INHIBITOR_SHARED_MEMORY, sizeof(int));
-    sem = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
-
-    waitAndLockSemaphore(statisticsSemaphore);
-    int* statistics = getSharedMemory(sharedMemoryId);
-    statistics[CREATED_ATOMS]++;
-    unlockSemaphore(statisticsSemaphore);
-    msgId = getMessageId(getpid());
 
     char** env = environ;
     while (*env != NULL)
@@ -91,15 +342,34 @@ int main() {
         *env++;
     }
 
+    sharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*10);
+    statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
+    inhibitorSemaphore = getSemaphore(INHIBITOR_SEMAPHORE);
+    inhibitorSharedMemoryId = getSharedMemoryId(INHIBITOR_SHARED_MEMORY, sizeof(int));
+    masterSignalSemaphore = getSemaphore(MASTER_SIGNAL_SEMAPHORE);
+
+    waitAndLockSemaphore(masterSignalSemaphore);
+    sendMessage(PID_MASTER, createMessage(2, stringJoin("atomCreate=", intToString(atomPid))));
+    sendSignal(PID_MASTER, SIGUSR1);
+    printf("ATOM SEND SIGNAL %i\n", PID_MASTER);
+
+    waitAndLockSemaphore(statisticsSemaphore);
+    int* statistics = getSharedMemory(sharedMemoryId);
+    statistics[CREATED_ATOMS]++;
+    unlockSemaphore(statisticsSemaphore);
+    messageChannelId = getMessageId(atomPid);
+
+
+
     setAtomFunction();
 
     while(true)
     {
         Message message = createEmptyMessage();
-        if(msgrcv(msgId, &message, sizeof(message), 0, 0) != -1)
+        if(msgrcv(messageChannelId, &message, sizeof(message), 0, 0) != -1)
         {
             printf("MESSAGGIONE = %s\n", message.messageText);
-            /*if (message.messageType == 2)
+            if (message.messageType == 2)
             {
                 if(stringStartsWith(message.messageText,"N_ATOM_MAX="))
                 {
@@ -121,7 +391,7 @@ int main() {
                     printf("Waiting for a new message...\n");
 
                 }
-            }*/
+            }
             if (message.messageType == 1)
             {
                 if (stringEquals(message.messageText, "split"))
@@ -154,7 +424,7 @@ int main() {
             printf("francodicicco3\n");
         }
     }
-
+    killMessageChannel(atomPid);
     return 0;
 }
 
@@ -162,16 +432,16 @@ void split()
 {
     if (N_ATOMICO > MIN_N_ATOMICO)
     {
-        /* effettuare scissione*/
+        // effettuare scissione
         int childAtomicNumber = getRandomIntBetween(MIN_N_ATOMICO,N_ATOMICO);
         N_ATOMICO -= childAtomicNumber;
         setAtomFunction();
         int energy = atomSplitFunction(N_ATOMICO,childAtomicNumber);
         if(isActive())
         {
-            sendMessage(PID_INHIBITOR,createMessage(2,stringJoin(intToString(getpid()),stringJoin(";SPLIT_ENERGY_PRODUCED=",intToString(energy)))));
+            sendMessage(PID_INHIBITOR,createMessage(2,stringJoin(intToString(atomPid),stringJoin(";SPLIT_ENERGY_PRODUCED=",intToString(energy)))));
             Message message = createEmptyMessage();
-            if(msgrcv(msgId, &message, sizeof(message), 2, 0) != -1)
+            if(msgrcv(messageChannelId, &message, sizeof(message), 2, 0) != -1)
             {
                 if(stringEquals(message.messageText,"1"))
                 {
@@ -212,14 +482,17 @@ int atomSplitFunction0(int parentAtomicNumber,int childAtomicNumber)
 {
     return parentAtomicNumber*parentAtomicNumber + childAtomicNumber*childAtomicNumber;
 }
+
 int atomSplitFunction1(int parentAtomicNumber,int childAtomicNumber)
 {
     return 2*parentAtomicNumber*childAtomicNumber;
 }
+
 int atomSplitFunction2(int parentAtomicNumber,int childAtomicNumber)
 {
     return (int)((parentAtomicNumber*childAtomicNumber)/3);
 }
+
 boolean isActive()
 {
     waitAndLockSemaphore(inhibitorSemaphore);
@@ -237,13 +510,13 @@ void createAtom(int childAtomicNumber, int energy)
         printf("Errore durante la creazione del processo Atomo\n");
         if(isActive())
         {
-            sendMessage(PID_INHIBITOR,createMessage(2,stringJoin(intToString(getpid()),";MELTDOWN")));
+            sendMessage(PID_INHIBITOR,createMessage(2,stringJoin(intToString(atomPid),";MELTDOWN")));
             Message message = createEmptyMessage();
-            if(msgrcv(msgId, &message, sizeof(message), 2, 0) != -1)
+            if(msgrcv(messageChannelId, &message, sizeof(message), 2, 0) != -1)
             {
                 if(stringEquals(message.messageText,"1"))
                 {
-                    waitAndLockSemaphore(sem);
+                    waitAndLockSemaphore(masterSignalSemaphore);
                     sendMessage(PID_MASTER, createMessage(1, "MELTDOWN"));
                     sendSignal(PID_MASTER, SIGUSR1);
                 }
@@ -257,7 +530,7 @@ void createAtom(int childAtomicNumber, int energy)
         }
         else
         {
-            waitAndLockSemaphore(sem);
+            waitAndLockSemaphore(masterSignalSemaphore);
             sendMessage(PID_MASTER, createMessage(1, "MELTDOWN"));
             sendSignal(PID_MASTER, SIGUSR1);
         }
@@ -269,7 +542,7 @@ void createAtom(int childAtomicNumber, int energy)
                 stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)),
                 stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)),
                 stringJoin("N_ATOMICO=", intToString(childAtomicNumber)),
-                stringJoin("PID_MASTER=",intToString(getppid())),
+                stringJoin("PID_MASTER=",intToString(PID_MASTER)),
                 stringJoin("N_ATOM_MAX=",intToString(N_ATOM_MAX)),
                 NULL};
         execve("./Atom", forkArgs, forkEnv);
@@ -278,7 +551,7 @@ void createAtom(int childAtomicNumber, int energy)
     }
 
     //sendMessage(atomPid, createMessage(2, stringJoin("N_ATOM_MAX=", intToString(N_ATOM_MAX))));
-    waitAndLockSemaphore(sem);
+    waitAndLockSemaphore(masterSignalSemaphore);
     sendMessage(PID_MASTER, createMessage(2, stringJoin("atomCreate=", intToString(atomPid))));
     sendSignal(PID_MASTER, SIGUSR1);
 
@@ -293,7 +566,7 @@ void createAtom(int childAtomicNumber, int energy)
 
     if (explode)
     {
-        waitAndLockSemaphore(sem);
+        waitAndLockSemaphore(masterSignalSemaphore);
         sendMessage(PID_MASTER, createMessage(1, "EXPLODE"));
         sendSignal(PID_MASTER, SIGUSR1);
     }
@@ -317,3 +590,16 @@ void setAtomFunction()
         atomSplitFunction = &atomSplitFunction2;
     }
 }
+
+boolean isTerminating()
+{
+    int semId = getSemaphore(TERMINATING_SEMAPHORE);
+    int memId = getSharedMemoryId(TERMINATING_SHARED_MEMORY, sizeof(int));
+    waitAndLockSemaphore(semId);
+    int* mem = getSharedMemory(memId);
+    boolean term = mem[0];
+    unlockSemaphore(semId);
+    printf("ATOM TERMINATING %i\n", term);
+    return term;
+}
+*/

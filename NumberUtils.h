@@ -13,4 +13,6 @@ double floor(double num);
 
 int getAtomFunction(int N_ATOMICO,int N_ATOM_MAX);
 
+int max(int num1, int num2);
+
 #endif //DISALVOFRANZA_PROGETTOSO_NUMBERUTILS_H

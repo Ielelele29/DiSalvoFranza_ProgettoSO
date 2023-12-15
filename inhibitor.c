@@ -9,67 +9,122 @@
 #include "SignalUtils.h"
 #include "SharedMemoryUtils.h"
 #include "NumberUtils.h"
+#include "ConfigUtils.h"
 
 extern char** environ;
 
-//Variabili
-int ENERGY_EXPLODE_THRESHOLD = -1;
+//Pid processi
+int masterPid = -1;
+int inhibitorPid = -1;
 
+//Variabili
+int energyExplodeThreshold = -1;
+
+//Code di messaggi
+int inhibitorMessageChannelId = -1;
 
 //Memoria condivisa
 int statisticsSharedMemoryId = -1;
-int inhibitorSharedMemoryId = -1;
 
 //Semafori
-int statisticsSemaphore = -1;
-int inhibitorSemaphore = -1;
+int statisticsSemaphoreId = -1;
 
 
-boolean isActive();
+void listenMessages();
+
 
 int main() {
-
-    //Lettura variabili d'ambiente
-    char** env = environ;
-    char* envKey;
-    char* envValue;
-    while (*env != NULL)
-    {
-        envKey = stringBefore(*env, "=");
-        envValue = stringAfter(*env, "=");
-        if (stringEquals(envKey, "ENERGY_EXPLODE_THRESHOLD"))
-        {
-            ENERGY_EXPLODE_THRESHOLD = atoi(envValue);
-        }
-        env++;
-    }
-    free(envKey);
-    free(envValue);
-
-    //Inizializzazione statistiche
-    statisticsSemaphore = getSemaphore(STATISTICS_SEMAPHORE);
-    statisticsSharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int) * 10);
-
-    //Inizializzazione inibitore
+    //Segnali
     ignoreSignal(SIGINT);
-    inhibitorSemaphore = getSemaphore(INHIBITOR_SEMAPHORE);
-    inhibitorSharedMemoryId = getSharedMemoryId(INHIBITOR_SHARED_MEMORY, sizeof(int));
+
+    //Pid processi
+    masterPid = getppid();
+    inhibitorPid = getpid();
+
+    //Variabili
+    energyExplodeThreshold = getConfigValue(ENERGY_EXPLODE_THRESHOLD);
 
     //Ricezione messaggi
-    int messageChannelId = getMessageId(getpid());
+    inhibitorMessageChannelId = getMessageId(inhibitorPid);
+
+    //Semafori
+    statisticsSemaphoreId = getSemaphore(STATISTICS_SEMAPHORE);
+
+    //Memoria condivisa
+    statisticsSharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*11);
+
+    sendMessage(masterPid, createMessage(1, "InhibitorReady"));
+    listenMessages();
+
+    killMessageChannel(inhibitorPid);
+    printf("END INHIBITOR\n");
+    return 0;
+}
+
+void listenMessages()
+{
     Message message;
-    while (true)
+    int result = msgrcv(inhibitorMessageChannelId, &message, sizeof(message), 0, 0);
+    if (result != -1)
     {
-        msgrcv(messageChannelId, &message, sizeof(message), 0, 0);
         if (message.messageType == 1) //Terminazione
         {
-            if (stringEquals(message.messageText, "term"))
+            if (stringEquals(message.messageText, "Stop"))
             {
-                break;
+                return;
+            }
+            else if (stringEquals(message.messageText, "Explode"))
+            {
+                waitAndLockSemaphore(statisticsSemaphoreId);
+                int* statistics = getSharedMemory(statisticsSharedMemoryId);
+                statistics[AVOIDED_EXPLOSIONS];
+                unlockSemaphore(statisticsSemaphoreId);
+            }
+            else if (stringEquals(message.messageText, "Meltdown"))
+            {
+                waitAndLockSemaphore(statisticsSemaphoreId);
+                int* statistics = getSharedMemory(statisticsSharedMemoryId);
+                statistics[AVOIDED_MELTDOWNS];
+                unlockSemaphore(statisticsSemaphoreId);
             }
         }
         else if (message.messageType == 2)
         {
+            char* key = stringBefore(message.messageText, "=");
+            char* valueS = stringAfter(message.messageText, "=");
+            int energy = atoi(valueS);
+            waitAndLockSemaphore(statisticsSemaphoreId);
+            int* statistics = getSharedMemory(statisticsSharedMemoryId);
+            int actualEnergy = statistics[ENERGY_AMOUNT];
+            double perc = actualEnergy/(double)energyExplodeThreshold;
+            int finalEnergy = (int)(energy*(1-(0.3*perc)));
+            if (stringEquals(key, "AtomSplit"))
+            {
+                if (finalEnergy > energyExplodeThreshold) //Evitare esplosioni
+                {
+                    statistics[AVOIDED_EXPLOSIONS]++;
+                    sendMessage(masterPid, createMessage(4, "0"));
+                }
+                else //Rallentamento scissione atomi
+                {
+                    if (getRandom() < 1-perc)
+                    {
+                        sendMessage(masterPid, createMessage(4, "1"));
+                    }
+                    else
+                    {
+                        statistics[DELAYED_ATOM_SPLIT]++;
+                        sendMessage(masterPid, createMessage(4, "0"));
+                    }
+                }
+            }
+            else if (stringEquals(key, "AtomEnergy"))
+            {
+                sendMessage(masterPid, createMessage(2, stringJoin("AtomEnergy=", intToString(finalEnergy))));
+            }
+            unlockSemaphore(statisticsSemaphoreId);
+
+            /*
             char* pidS = stringBefore(message.messageText, ";");
             int pid = atoi(pidS);
             if (isActive())
@@ -119,18 +174,8 @@ int main() {
             {
                 sendMessage(pid, createMessage(2, "1"));
             }
-            free(pidS);
+            free(pidS);*/
         }
     }
-    printf("END INHIBITOR\n");
-    return 0;
-}
-
-boolean isActive()
-{
-    waitAndLockSemaphore(inhibitorSemaphore);
-    int* memory = getSharedMemory(inhibitorSharedMemoryId);
-    boolean isActive = *memory ? true : false;
-    unlockSemaphore(inhibitorSemaphore);
-    return isActive;
+    listenMessages();
 }

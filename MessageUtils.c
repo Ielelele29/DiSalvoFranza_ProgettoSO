@@ -35,26 +35,40 @@ Message createEmptyMessage()
 
 void sendMessage(pid_t targetPid, Message message)
 {
-    if (msgsnd(getMessageId(targetPid), &message, sizeof(message), 0) == -1)
+    if (targetPid != -1)
     {
-        perror("Send message error");
+        if (msgsnd(getMessageId(targetPid), &message, sizeof(message), 0) == -1)
+        {
+            perror("Send message error");
+        }
+    }
+    else
+    {
+        printf("Send message pid error: %i\nMessage: %s\n", targetPid, message.messageText);
     }
 }
 
 int getMessageId(pid_t targetPid)
 {
-    int id = msgget(getKey(targetPid), IPC_CREAT | 0644);
-    if (id == -1)
+    if (targetPid != -1)
     {
-        perror("Get message channel id error");
+        int id = msgget(getKey(targetPid), IPC_CREAT | 0644);
+        if (id == -1)
+        {
+            perror("Get message channel id error");
+        }
+        return id;
     }
-    return id;
+    return -1;
 }
 
 void killMessageChannel(pid_t targetPid)
 {
-    if (msgctl(getMessageId(targetPid), IPC_RMID, NULL) == -1)
+    if (targetPid != -1)
     {
-        perror("Kill message channel error");
+        if (msgctl(getMessageId(targetPid), IPC_RMID, NULL) == -1)
+        {
+            perror("Kill message channel error");
+        }
     }
 }

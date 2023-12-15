@@ -13,15 +13,223 @@
 #include <time.h>
 #include "NumberUtils.h"
 #include "SharedMemoryUtils.h"
+#include "ConfigUtils.h"
 
+
+//Pid processi
+int masterPid = -1;
+int activatorPid = -1;
+
+//Code di messaggi
+int activatorMessageChannelId = -1;
+
+//Memoria condivisa
+int statisticsSharedMemoryId = -1;
+
+//Semafori
+int statisticsSemaphoreId = -1;
+
+int step = -1;
+
+void listenMessage();
+void splitAtoms();
+void waitNano();
+
+
+int main()
+{
+    //Segnali
+    ignoreSignal(SIGINT);
+
+    //Pid processi
+    masterPid = getppid();
+    activatorPid = getpid();
+
+    //Code di messaggi
+    activatorMessageChannelId = getMessageId(activatorPid);
+
+    //Semafori
+    statisticsSemaphoreId = getSemaphore(STATISTICS_SEMAPHORE);
+
+    //Memoria condivisa
+    statisticsSharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*11);
+
+    //Inizializzazione variabili
+    step = getConfigValue(STEP);
+
+    sendMessage(masterPid, createMessage(1, "ActivatorReady"));
+    listenMessage();
+
+    killMessageChannel(activatorPid);
+    printf("END ACTIVATOR\n");
+    return 0;
+}
+
+int i = 0;
+void splitAtoms()
+{
+    Atom atoms = NULL;
+    sendMessage(masterPid, createMessage(1,"AtomList"));
+    while(true)
+    {
+        Message message = createEmptyMessage();
+        int result = msgrcv(activatorMessageChannelId, &message, sizeof(message), 0, 0);
+        if (result != -1)
+        {
+            if (message.messageType == 1)
+            {
+                if (stringEquals(message.messageText, "AtomEnd"))
+                {
+                    break;
+                }
+            }
+            else if (message.messageType == 2)
+            {
+                char* key = stringBefore(message.messageText, "=");
+                char* value = stringAfter(message.messageText, "=");
+                if (stringStartsWith(key, "AtomPid"))
+                {
+                    addNode(&atoms, atoi(value));
+                }
+                free(key);
+                free(value);
+            }
+        }
+    }
+
+    int j = 0;
+    while (atoms != NULL)
+    {
+        if ((i+j)%3 == 0)
+        {
+            sendMessage(getNodeValue(atoms), createMessage(1, "Split"));
+            waitAndLockSemaphore(statisticsSemaphoreId);
+            int* statistics = getSharedMemory(statisticsSharedMemoryId);
+            statistics[ACTIVATION_AMOUNT]++;
+            unlockSemaphore(statisticsSemaphoreId);
+        }
+        atoms = getNextNode(atoms);
+        j++;
+    }
+    i++;
+    waitNano();
+    splitAtoms();
+}
+
+void waitNano()
+{
+    double nanoTime = 500000000;//step*(getRandom()+0.4);
+    struct timespec timeToSleep;
+    timeToSleep.tv_sec = (int) (nanoTime/1000000000);
+    timeToSleep.tv_nsec = (int) ((int)nanoTime%1000000000);
+    nanosleep(&timeToSleep, NULL);
+}
+
+void listenMessage()
+{
+    Message message = createEmptyMessage();
+    int result = msgrcv(activatorMessageChannelId, &message, sizeof(message), 0, 0);
+    if (result != -1)
+    {
+        if (message.messageType == 1)
+        {
+            if (stringEquals(message.messageText, "Start"))
+            {
+                splitAtoms();
+                return;
+            }
+        }
+    }
+    listenMessage();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 void tick();
 void split();
 int STEP = -1;
 int indice = 0;
-int msgId = -1;
+int messageChannelId = -1;
 int sharedMemoryId = -1;
 int statisticsSemaphore = -1;
-int sem = -1;
+int masterSignalSemaphore = -1;
 extern char **environ;
 
 int main() {
@@ -34,9 +242,9 @@ int main() {
     char** env = environ;
     while (*env != NULL)
     {
-        if(stringStartsWith(*env,"STEP="))
+        if (stringStartsWith(*env,"STEP="))
         {
-            STEP = atoi(stringAfter(*env,"="));
+            STEP = atoi(stringAfter(*env, "="));
         }
         else
         {
@@ -45,13 +253,13 @@ int main() {
         *env++;
     }
 
-    msgId = getMessageId(getpid());
-    Message message = createEmptyMessage();
-    while(true)
+    messageChannelId = getMessageId(getpid());
+    while (true)
     {
-        if(msgrcv(msgId, &message, sizeof(message), 0, 0) != -1)
+        Message message = createEmptyMessage();
+        if (msgrcv(messageChannelId, &message, sizeof(message), 1, 0) != -1)
         {
-            /*if (message.messageType == 2)
+            if (message.messageType == 2)
             {
                 if(stringStartsWith(message.messageText,"MIN_N_ATOMICO="))
                 {
@@ -74,10 +282,10 @@ int main() {
             {
                 printf("Error invalid message!(invalid type of message)\n");
                 printf("Waiting for a new message...\n");
-            }*/
+            }
             if (message.messageType == 1)
             {
-                if(stringStartsWith(message.messageText,"start"))
+                if (stringStartsWith(message.messageText,"start"))
                 {
                     tick();
                     break;
@@ -104,13 +312,15 @@ int main() {
             printf("CuloAllegro3\n");
         }
     }
-
+    killMessageChannel(getpid());
     return 0;
 }
 
 void waitNano()
 {
     double nanoTime = STEP*(getRandom()+0.4);
+    printf("s to sleep %i\n", (int)nanoTime/1000000000);
+    printf("ns to sleep %i\n", (int)nanoTime%1000000000);
     struct timespec timeToSleep;
     timeToSleep.tv_sec = (int)nanoTime/1000000000;
     timeToSleep.tv_nsec = (int)nanoTime%1000000000;
@@ -119,12 +329,12 @@ void waitNano()
 
 void tick(){
 
-    msgId = getMessageId(getpid());
+    messageChannelId = getMessageId(getpid());
 
-    while(true)
+    while (true)
     {
         Message message = createEmptyMessage();
-        if(msgrcv(msgId, &message, sizeof(message), 1, IPC_NOWAIT) == -1)
+        if (msgrcv(messageChannelId, &message, sizeof(message), 1, IPC_NOWAIT) == -1)
         {
             waitNano();
             split();
@@ -155,13 +365,15 @@ void split()
     waitAndLockSemaphore(sem);
     sendMessage(pidMaster, createMessage(2,stringJoin("atomList=", intToString(getpid()))));
     sendSignal(pidMaster, SIGUSR1);
-    msgId = getMessageId(pidMaster);
+    messageChannelId = getMessageId(getpid());
     printf("pidMaster secondo activator %i\n", pidMaster);
     while(true)
     {
         Message message = createEmptyMessage();
-        if(msgrcv(msgId, &message, sizeof(message), 2, 0) == -1)
+        int msgr = msgrcv(messageChannelId, &message, sizeof(message), 2, 0);
+        if (msgr != -1)
         {
+            printf("mESSAGGIO ACT = %s\n", message.messageText);
             if(stringStartsWith(message.messageText,"atomPid="))
             {
                 addNode(&atoms,atoi(stringAfter(message.messageText, "=")));
@@ -179,6 +391,7 @@ void split()
         }
         else
         {
+            perror("Errore messaggio: \n");
             printf("Error receiving message!\n");
             printf("Waiting for a new message...\n");
             printf("CuloAllegroDiverso2\n");
@@ -186,26 +399,34 @@ void split()
     }
 
 
-    int i = 0;
+    int j = 0;
 
-    while(i < nodeSize(atoms))
+    printf("Nodesime = %i\n", nodeSize(atoms));
+    while (j < nodeSize(atoms))
     {
-        if(i+indice%3 == 0)
+        printf("j = %i %i %i %i\n", j, indice, j+indice, (j+indice)%3);
+        if ((j+indice)%3 == 0)
         {
             sendMessage(atoms->value, createMessage(1,"split"));
+            printf("locking masterSignalSemaphore\n");
+
             waitAndLockSemaphore(statisticsSemaphore);
+            printf("locked masterSignalSemaphore\n");
+
             int* statistics = getSharedMemory(sharedMemoryId);
             statistics[ACTIVATION_AMOUNT]++;
             unlockSemaphore(statisticsSemaphore);
+            printf("unlock masterSignalSemaphore\n");
+
         }
         atoms = getNextNode(atoms);
-        i++;
+        j++;
     }
-    indice = indice+i%3;
+    indice = indice+1%3;
 
 
     //sendMessage(atomoPid, createMessage(2,stringJoin("ENERGY_EXPLODE_THRESHOLD=", intToString(ENERGY_EXPLODE_THRESHOLD)));
     //sendMessage(atomoPid, createMessage(2,stringJoin("MIN_N_ATOMICO=", intToString(MIN_N_ATOMICO)));
 
 
-}
+}*/

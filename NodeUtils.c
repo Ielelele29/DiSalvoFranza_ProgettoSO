@@ -1,7 +1,8 @@
-#include "NodeUtils.h"
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "CustomTypes.h"
+#include "NodeUtils.h"
 
 Node* createNode(int value)
 {
@@ -56,7 +57,7 @@ void removeNode(Node* node)
     if (node != NULL)
     {
         Node *parent = node->previousNode;
-        Node *child = node->previousNode;
+        Node *child = node->nextNode;
         if (parent != NULL)
         {
             parent->nextNode = child;
@@ -186,7 +187,7 @@ int nodeSize(Node* node)
         node = getFirstNode(node);
         Node* nextNode = node;
         int i = 0;
-        while (hasNextNode(nextNode))
+        while (nextNode != NULL)
         {
             nextNode = getNextNode(nextNode);
             if (nextNode == node)
@@ -198,4 +199,24 @@ int nodeSize(Node* node)
         return i;
     }
     return -1;
+}
+
+void printValues(Node* node)
+{
+    int i = 0;
+    if (node != NULL)
+    {
+        node = getFirstNode(node);
+        Node* nextNode = node;
+        while (nextNode != NULL)
+        {
+            printf("Node value = %i\n", getNodeValue(nextNode));
+            nextNode = getNextNode(nextNode);
+            if (nextNode == node || i == 10)
+            {
+                break;
+            }
+            i++;
+        }
+    }
 }
