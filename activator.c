@@ -21,6 +21,7 @@ int masterPid = -1;
 int activatorPid = -1;
 
 //Code di messaggi
+int masterMessageChannelId = -1;
 int activatorMessageChannelId = -1;
 
 //Memoria condivisa
@@ -31,21 +32,30 @@ int statisticsSemaphoreId = -1;
 
 int step = -1;
 
+boolean checkMessage();
 void listenMessage();
 void splitAtoms();
 void waitNano();
 
 
+
+void checkError(int sig)
+{
+    printf("Activator error\n\n\n");
+}
+
 int main()
 {
     //Segnali
     ignoreSignal(SIGINT);
+    setSignalAction(SIGSEGV, checkError);
 
     //Pid processi
     masterPid = getppid();
     activatorPid = getpid();
 
     //Code di messaggi
+    masterMessageChannelId = getMessageId(masterPid);
     activatorMessageChannelId = getMessageId(activatorPid);
 
     //Semafori
@@ -56,11 +66,14 @@ int main()
 
     //Inizializzazione variabili
     step = getConfigValue(STEP);
+    unloadConfig();
 
-    sendMessage(masterPid, createMessage(1, "ActivatorReady"));
+    sendMessage(masterMessageChannelId, createMessage(1, "ActivatorReady"));
     listenMessage();
 
-    killMessageChannel(activatorPid);
+    killMessageChannel(activatorMessageChannelId);
+    detachFromSharedMemory(statisticsSharedMemoryId);
+    sendMessage(masterMessageChannelId, createMessage(1, "ActivatorStop"));
     printf("END ACTIVATOR\n");
     return 0;
 }
@@ -68,57 +81,62 @@ int main()
 int i = 0;
 void splitAtoms()
 {
-    Atom atoms = NULL;
-    sendMessage(masterPid, createMessage(1,"AtomList"));
-    while(true)
+    if (checkMessage())
     {
-        Message message = createEmptyMessage();
-        int result = msgrcv(activatorMessageChannelId, &message, sizeof(message), 0, 0);
-        if (result != -1)
+        printf("START SPLIT ATOMS %i\n\n", masterMessageChannelId);
+        Atom atoms = NULL;
+        sendMessage(masterMessageChannelId, createMessage(1,"AtomList"));
+        while(true)
         {
-            if (message.messageType == 1)
+            Message message = createEmptyMessage();
+            int result = msgrcv(activatorMessageChannelId, &message, sizeof(message), 0, 0);
+            if (result != -1)
             {
-                if (stringEquals(message.messageText, "AtomEnd"))
+                printf("Activator message = %s\n", message.messageText);
+                if (message.messageType == 1)
                 {
-                    break;
+                    if (stringEquals(message.messageText, "AtomEnd"))
+                    {
+                        break;
+                    }
                 }
-            }
-            else if (message.messageType == 2)
-            {
-                char* key = stringBefore(message.messageText, "=");
-                char* value = stringAfter(message.messageText, "=");
-                if (stringStartsWith(key, "AtomPid"))
+                else if (message.messageType == 2)
                 {
-                    addNode(&atoms, atoi(value));
+                    char* key = stringBefore(message.messageText, "=");
+                    char* value = stringAfter(message.messageText, "=");
+                    if (stringStartsWith(key, "AtomPid"))
+                    {
+                        addNode(&atoms, atoi(value));
+                    }
+                    free(key);
+                    free(value);
                 }
-                free(key);
-                free(value);
             }
         }
-    }
 
-    int j = 0;
-    while (atoms != NULL)
-    {
-        if ((i+j)%3 == 0)
+        int j = 0;
+        while (atoms != NULL)
         {
-            sendMessage(getNodeValue(atoms), createMessage(1, "Split"));
-            waitAndLockSemaphore(statisticsSemaphoreId);
-            int* statistics = getSharedMemory(statisticsSharedMemoryId);
-            statistics[ACTIVATION_AMOUNT]++;
-            unlockSemaphore(statisticsSemaphoreId);
+            if ((i+j)%3 == 0)
+            {
+                sendMessage(getMessageId(getNodeValue(atoms)), createMessage(1, "Split"));
+                waitAndLockSemaphore(statisticsSemaphoreId);
+                int* statistics = getSharedMemory(statisticsSharedMemoryId);
+                statistics[ACTIVATION_AMOUNT]++;
+                unlockSemaphore(statisticsSemaphoreId);
+            }
+            atoms = getNextNode(atoms);
+            j++;
         }
-        atoms = getNextNode(atoms);
-        j++;
+        i++;
+        waitNano();
+        splitAtoms();
     }
-    i++;
-    waitNano();
-    splitAtoms();
 }
 
 void waitNano()
 {
-    double nanoTime = 500000000;//step*(getRandom()+0.4);
+    double nanoTime = 1000000000;//step*(getRandom()+0.4);
     struct timespec timeToSleep;
     timeToSleep.tv_sec = (int) (nanoTime/1000000000);
     timeToSleep.tv_nsec = (int) ((int)nanoTime%1000000000);
@@ -141,6 +159,23 @@ void listenMessage()
         }
     }
     listenMessage();
+}
+
+boolean checkMessage()
+{
+    Message message = createEmptyMessage();
+    int result = msgrcv(activatorMessageChannelId, &message, sizeof(message), 0, IPC_NOWAIT);
+    if (result != -1)
+    {
+        if (message.messageType == 1)
+        {
+            if (stringEquals(message.messageText, "Stop"))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 

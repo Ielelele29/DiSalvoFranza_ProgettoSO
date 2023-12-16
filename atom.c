@@ -22,6 +22,7 @@ int masterPid = -1;
 int atomPid = -1;
 
 //Code di messaggi
+int masterMessageChannelId = -1;
 int atomMessageChannelId = -1;
 
 //Memoria condivisa
@@ -40,9 +41,17 @@ void listenMessages();
 boolean split();
 int getSplitEnergy(int firstAtomicNumber, int secondAtomicNumber);
 
+
+
+void checkError(int sig)
+{
+    printf("Atom error\n\n\n");
+}
+
 int main()
 {
     ignoreSignal(SIGINT);
+    setSignalAction(SIGSEGV, checkError);
 
     char** env = environ;
     while (*env != NULL)
@@ -62,6 +71,7 @@ int main()
     atomPid = getpid();
 
     //Code di messaggi
+    masterMessageChannelId = getMessageId(masterPid);
     atomMessageChannelId = getMessageId(atomPid);
 
     //Semafori
@@ -73,17 +83,21 @@ int main()
     //Config
     minAtomicNumber = getConfigValue(MIN_N_ATOMICO);
     energyExplodeThreshold = getConfigValue(ENERGY_EXPLODE_THRESHOLD);
+    unloadConfig();
 
+    //Statistics
     waitAndLockSemaphore(statisticsSemaphoreId);
     int* statistics = getSharedMemory(statisticsSharedMemoryId);
     statistics[CREATED_ATOMS]++;
     unlockSemaphore(statisticsSemaphoreId);
 
-    sendMessage(masterPid, createMessage(2, stringJoin("AtomCreate=", intToString(atomPid))));
+    sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomCreate=", intToString(atomPid))));
     listenMessages();
 
-    killMessageChannel(atomPid);
-    printf("END ATOM\n");
+    killMessageChannel(atomMessageChannelId);
+    detachFromSharedMemory(statisticsSharedMemoryId);
+    sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomDie=", intToString(atomPid))));
+ //   printf("END ATOM\n");
     return 0;
 }
 
@@ -94,6 +108,7 @@ void listenMessages()
     int result = msgrcv(atomMessageChannelId, &message, sizeof(message), 1, 0);
     if (result != -1)
     {
+    //    printf("[Atom] Messaggio = %s\n", message.messageText);
         if (message.messageType == 1)
         {
             if (stringEquals(message.messageText, "Stop"))
@@ -114,67 +129,94 @@ void listenMessages()
 
 boolean split()
 {
-    printf("[Atom] Splitting with atomic number = %i\n", atomicNumber);
+ //   printf("[Atom] Splitting with atomic number = %i\n", atomicNumber);
     if (atomicNumber > minAtomicNumber)
     {
         // effettuare scissione
-        int childAtomicNumber = getRandomIntBetween(minAtomicNumber, atomicNumber);
-        printf("[Atom] Child atomic number = %i\n", childAtomicNumber);
+        int childAtomicNumber = getRandomIntBetween(minAtomicNumber, atomicNumber-1);
+    //    printf("[Atom] Child atomic number = %i\n", childAtomicNumber);
         atomicNumber -= childAtomicNumber;
         int energy = getSplitEnergy(atomicNumber, childAtomicNumber);
-        sendMessage(masterPid, createMessage(3, stringJoin(intToString(atomPid), stringJoin(";AtomSplit=", intToString(energy)))));
+        sendMessage(masterMessageChannelId, createMessage(3, stringJoin(intToString(atomPid), stringJoin(";AtomSplit=", intToString(energy)))));
         Message message = createEmptyMessage();
-        int result = msgrcv(atomMessageChannelId, &message, sizeof(message), 4, 0);
+        int result = msgrcv(atomMessageChannelId, &message, sizeof(message), 0, 0);
+    //    printf("[Atom] %i message 1 = %s\n", getpid(), message.messageText);
         if (result != -1)
         {
-            boolean canCreate = stringEquals(message.messageText, "1") ? true : false;
-            if (canCreate)
+            if (message.messageType == 1)
             {
-                pid_t childAtomPid = fork();
-                if (childAtomPid == -1)
+                if (stringEquals(message.messageText, "Stop"))
                 {
-                    printf("Errore durante la creazione del processo Atomo\n");
-                    sendMessage(masterPid, createMessage(1, "Meltdown"));
-                    return false;
+                    printf("STOPPONE 1\n\n\n");
+                    return true;
                 }
-                else if (childAtomPid == 0)
+            }
+            else if (message.messageType == 4)
+            {
+                boolean canCreate = stringEquals(message.messageText, "1") ? true : false;
+                if (canCreate)
                 {
-                    char* forkArgs[] = {NULL};
-                    char* forkEnv[] = {
-                            stringJoin("AtomicNumber=", intToString(childAtomicNumber)),
-                            stringJoin("MasterPid=", intToString(masterPid)),
-                            NULL};
-                    execve("./Atom", forkArgs, forkEnv);
-                    printf("Errore Processo Atomo\n");
-                    return false;
-                }
-                int finalEnergy = energy;
-                sendMessage(masterPid, createMessage(3, stringJoin(intToString(atomPid), stringJoin(";AtomEnergy=", intToString(energy)))));
-                message = createEmptyMessage();
-                result = msgrcv(atomMessageChannelId, &message, sizeof(message), 2, 0);
-                if (result != -1)
-                {
-                    char* key = stringBefore(message.messageText, "=");
-                    char* value = stringAfter(message.messageText, "=");
-                    if (stringEquals(key, "AtomEnergy"))
+                    pid_t childAtomPid = fork();
+                    if (childAtomPid == -1)
                     {
-                        finalEnergy = atoi(value);
+                        printf("Errore durante la creazione del processo Atomo\n");
+                        sendMessage(masterMessageChannelId, createMessage(1, "Meltdown"));
+                        return false;
                     }
+                    else if (childAtomPid == 0)
+                    {
+                        char* forkArgs[] = {NULL};
+                        char* forkEnv[] = {
+                                stringJoin("AtomicNumber=", intToString(childAtomicNumber)),
+                                stringJoin("MasterPid=", intToString(masterPid)),
+                                NULL};
+                        execve("./Atom", forkArgs, forkEnv);
+                        printf("Errore Processo Atomo\n");
+                        return false;
+                    }
+                    int finalEnergy = energy;
+                    sendMessage(masterMessageChannelId, createMessage(3, stringJoin(intToString(atomPid), stringJoin(";AtomEnergy=", intToString(energy)))));
+                    message = createEmptyMessage();
+                    result = msgrcv(atomMessageChannelId, &message, sizeof(message), 0, 0);
+                //    printf("[Atom] %i message 2 = %s\n", getpid(), message.messageText);
+                    if (result != -1)
+                    {
+                        if (message.messageType == 1)
+                        {
+                            if (stringEquals(message.messageText, "Stop"))
+                            {
+                                printf("STOPPONE 2\n\n\n");
+                                return true;
+                            }
+                        }
+                        else if (message.messageType == 2)
+                        {
+                            char* key = stringBefore(message.messageText, "=");
+                            char* value = stringAfter(message.messageText, "=");
+                            if (stringEquals(key, "AtomEnergy"))
+                            {
+                                finalEnergy = atoi(value);
+                            }
+                        }
+                    }
+                    printf("WAIT STATS ATOM\n");
+                    waitAndLockSemaphore(statisticsSemaphoreId);
+                    printf("GOT\n");
+                    int* statistics = getSharedMemory(statisticsSharedMemoryId);
+                    statistics[SPLIT_AMOUNT]++;
+                    statistics[ABSORBED_ENERGY] += energy - finalEnergy;
+                    statistics[ENERGY_AMOUNT] += finalEnergy;
+                    statistics[ENERGY_PRODUCED] += finalEnergy;
+                    if (statistics[ENERGY_AMOUNT] > energyExplodeThreshold)
+                    {
+                        sendMessage(masterMessageChannelId, createMessage(1, "Explode"));
+                    }
+                    unlockSemaphore(statisticsSemaphoreId);
+                    return false;
                 }
-                waitAndLockSemaphore(statisticsSemaphoreId);
-                int* statistics = getSharedMemory(statisticsSharedMemoryId);
-                statistics[SPLIT_AMOUNT]++;
-                statistics[ABSORBED_ENERGY] += finalEnergy - energy;
-                statistics[ENERGY_AMOUNT] += finalEnergy;
-                statistics[ENERGY_PRODUCED] += finalEnergy;
-                if (statistics[ENERGY_AMOUNT] > energyExplodeThreshold)
-                {
-                    sendMessage(masterPid, createMessage(1, "Explode"));
-                }
-                unlockSemaphore(statisticsSemaphoreId);
-                return false;
             }
         }
+        return true;
     }
     else
     {
@@ -182,7 +224,6 @@ boolean split()
         int* statistics = getSharedMemory(statisticsSharedMemoryId);
         statistics[DEAD_ATOMS]++;
         unlockSemaphore(statisticsSemaphoreId);
-        sendMessage(masterPid, createMessage(2, stringJoin("AtomDie=", intToString(atomPid))));
         return true;
     }
 }

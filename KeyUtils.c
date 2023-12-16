@@ -9,5 +9,5 @@ int getKey(int id)
     {
         perror("Key generation error");
     }
-    return key;
+    return key+id;
 }

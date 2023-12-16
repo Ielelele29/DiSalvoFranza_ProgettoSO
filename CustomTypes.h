@@ -17,7 +17,7 @@ typedef struct Node {
 typedef Node* Atom;
 
 #define maxMessageLength 100
-typedef struct {
+typedef struct Message {
     long messageType;
     char messageText[maxMessageLength];
 } Message;

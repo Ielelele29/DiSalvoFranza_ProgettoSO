@@ -9,6 +9,8 @@ int getSharedMemorySize(int sharedMemoryId);
 
 void clearSharedMemory(int sharedMemoryId);
 
+void detachFromSharedMemory(int sharedMemoryId);
+
 void deleteSharedMemory(int sharedMemoryId);
 
 #endif //DISALVOFRANZA_PROGETTOSO_SHAREDMEMORYUTILS_H

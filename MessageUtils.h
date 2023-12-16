@@ -7,10 +7,10 @@ Message createMessage(long type, const char* string);
 
 Message createEmptyMessage();
 
-void sendMessage(pid_t targetPid, Message message);
+void sendMessage(int messageChannelId, Message message);
 
 int getMessageId(pid_t pid);
 
-void killMessageChannel(pid_t targetPid);
+void killMessageChannel(int messageChannelId);
 
 #endif //DISALVOFRANZA_PROGETTOSO_MESSAGEUTILS_H

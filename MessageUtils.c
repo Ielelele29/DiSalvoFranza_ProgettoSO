@@ -33,18 +33,18 @@ Message createEmptyMessage()
     return message;
 }
 
-void sendMessage(pid_t targetPid, Message message)
+void sendMessage(int messageChannelId, Message message)
 {
-    if (targetPid != -1)
+    if (messageChannelId != -1)
     {
-        if (msgsnd(getMessageId(targetPid), &message, sizeof(message), 0) == -1)
+        if (msgsnd(messageChannelId, &message, sizeof(message), 0) == -1)
         {
             perror("Send message error");
         }
     }
     else
     {
-        printf("Send message pid error: %i\nMessage: %s\n", targetPid, message.messageText);
+        printf("Send message channel id error: %i\nMessage: %s\n", messageChannelId, message.messageText);
     }
 }
 
@@ -62,11 +62,11 @@ int getMessageId(pid_t targetPid)
     return -1;
 }
 
-void killMessageChannel(pid_t targetPid)
+void killMessageChannel(int messageChannelId)
 {
-    if (targetPid != -1)
+    if (messageChannelId != -1)
     {
-        if (msgctl(getMessageId(targetPid), IPC_RMID, NULL) == -1)
+        if (msgctl(messageChannelId, IPC_RMID, NULL) == -1)
         {
             perror("Kill message channel error");
         }

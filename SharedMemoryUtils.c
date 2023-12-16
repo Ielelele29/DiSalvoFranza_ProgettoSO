@@ -45,6 +45,14 @@ void clearSharedMemory(int sharedMemoryId)
     }
 }
 
+void detachFromSharedMemory(int sharedMemoryId)
+{
+    if (shmdt(shmat(sharedMemoryId, NULL, 0)) == -1)
+    {
+        perror("Detach from shared memory error");
+    }
+}
+
 void deleteSharedMemory(int sharedMemoryId)
 {
     if (shmctl(sharedMemoryId, IPC_RMID, NULL) == -1)

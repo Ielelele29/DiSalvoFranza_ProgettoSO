@@ -91,6 +91,14 @@ void createConfig()
     }
 }
 
+void unloadConfig()
+{
+    if (configSemaphore != -1)
+    {
+        detachFromSharedMemory(configSharedMemory);
+    }
+}
+
 void deleteConfig()
 {
     if (configSemaphore != -1)

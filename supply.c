@@ -23,6 +23,7 @@ int masterPid = -1;
 int supplyPid = -1;
 
 //Code di messaggi
+int masterMessageChannelId = -1;
 int supplyMessageChannelId = -1;
 
 //Memoria condivisa
@@ -44,16 +45,23 @@ void createAtom();
 
 
 
+void checkError(int sig)
+{
+    printf("Supply error\n\n\n");
+}
+
 int main()
 {
     //Segnali
     ignoreSignal(SIGINT);
+    setSignalAction(SIGSEGV, checkError);
 
     //Pid processi
     masterPid = getppid();
     supplyPid = getpid();
 
     //Code di messaggi
+    masterMessageChannelId = getMessageId(masterPid);
     supplyMessageChannelId = getMessageId(supplyPid);
 
     //Semafori
@@ -67,14 +75,17 @@ int main()
     atomsAmount = getConfigValue(N_NUOVI_ATOMI);
     minAtomicNumber = getConfigValue(MIN_N_ATOMICO);
     maxAtomicNumber = getConfigValue(N_ATOM_MAX);
+    unloadConfig();
 
-    sendMessage(masterPid, createMessage(1, "SupplyReady"));
+    printf("Master secondo supply = %i\n", masterMessageChannelId);
+    sendMessage(masterMessageChannelId, createMessage(1, "SupplyReady"));
     listenMessage();
 
-    killMessageChannel(supplyPid);
+    killMessageChannel(supplyMessageChannelId);
+    detachFromSharedMemory(statisticsSharedMemoryId);
+    sendMessage(masterMessageChannelId, createMessage(1, "SupplyStop"));
     printf("END SUPPLY\n");
     return 0;
-
 }
 
 
@@ -97,12 +108,12 @@ void generateAtoms()
 
 void createAtom()
 {
-    printf("Creazione atomo da Supply\n");
+ //   printf("Creazione atomo da Supply\n");
     pid_t atomPid = fork();
     if (atomPid == -1)
     {
         printf("Errore durante la creazione del processo Atomo\n");
-        sendMessage(masterPid, createMessage(1, "Meltdown"));
+        sendMessage(masterMessageChannelId, createMessage(1, "Meltdown"));
     }
     else if (atomPid == 0)
     {
@@ -112,7 +123,7 @@ void createAtom()
                 stringJoin("AtomicNumber=", intToString(atomicNumber)),
                 stringJoin("MasterPid=", intToString(masterPid)),
                 NULL};
-        printf("Atomo creato correttamente da Supply\n");
+    //    printf("Atomo creato correttamente da Supply\n");
         execve("./Atom", forkArgs, forkEnv);
         printf("Errore Processo Atomo\n");
         return;

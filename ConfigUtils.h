@@ -7,6 +7,8 @@ void createConfig();
 
 void deleteConfig();
 
+void unloadConfig();
+
 void setConfigValue(Config config, int value);
 
 int getConfigValue(Config config);

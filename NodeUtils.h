@@ -8,7 +8,7 @@ void addNode(Node** parent, int value);
 
 void addNodeAfter(Node* parent, int value);
 
-void removeNode(Node* node);
+Node* removeNode(Node* node);
 
 Node* getFirstNode(Node* node);
 

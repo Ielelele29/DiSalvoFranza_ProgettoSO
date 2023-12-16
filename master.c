@@ -3,8 +3,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/msg.h>
-#include <time.h>
-#include <execinfo.h>
 #include "StringUtils.h"
 #include "MessageUtils.h"
 #include "SemaphoreUtils.h"
@@ -13,6 +11,7 @@
 #include "NodeUtils.h"
 #include "NumberUtils.h"
 #include "ConfigUtils.h"
+#include "KeyUtils.h"
 
 
 //Pid processi
@@ -24,6 +23,9 @@ Atom atoms;
 
 //Code di messaggi
 int masterMessageChannelId = -1;
+int supplyMessageChannelId = -1;
+int activatorMessageChannelId = -1;
+int inhibitorMessageChannelId = -1;
 
 //Memoria condivisa
 int statisticsSharedMemoryId = -1;
@@ -33,7 +35,7 @@ int statisticsSemaphoreId = -1;
 
 //Variabili
 boolean isActivatorReady = false;
-boolean isSupplyReady = true;
+boolean isSupplyReady = false;
 boolean isInhibitorReady = false;
 
 boolean isTerminating = false;
@@ -41,6 +43,7 @@ boolean isInhibitorActive = -1;
 int cumulativeStatistics[11] = {0};
 int processes = 0;
 
+int initialAtoms = -1;
 int energyDemand = -1;
 int remainingTime = -1;
 int minAtomicNumber = -1;
@@ -48,6 +51,7 @@ int maxAtomicNumber = -1;
 
 
 void checkStart();
+boolean checkStop();
 void listenMessages();
 void onPrintStatistics(int sig);
 void onActivateDeactivateInhibitor(int sig);
@@ -58,9 +62,15 @@ int createActivator();
 int createInhibitor();
 int createAtom();
 
+void checkError(int sig)
+{
+    printf("Master error\n\n\n");
+    exit(0);
+}
+
 int main()
 {
-    printf("Hello, World 4!\n");
+    printf("Hello, World 4! PID = %i\n", getpid());
     printf("pidMaster secondo master %i\n", getpid());
 
     //Lettura configurazione
@@ -69,6 +79,7 @@ int main()
     remainingTime = getConfigValue(SIM_DURATION);
     minAtomicNumber = getConfigValue(MIN_N_ATOMICO);
     maxAtomicNumber = getConfigValue(N_ATOM_MAX);
+    initialAtoms = getConfigValue(N_ATOMI_INIT);
 
     printf("ENERGY_DEMAND = %i\n", getConfigValue(ENERGY_DEMAND));
     printf("ENERGY_EXPLODE_THRESHOLD = %i\n", getConfigValue(ENERGY_EXPLODE_THRESHOLD));
@@ -78,6 +89,7 @@ int main()
     printf("MIN_N_ATOMICO = %i\n", getConfigValue(MIN_N_ATOMICO));
     printf("STEP = %i\n", getConfigValue(STEP));
     printf("SIM_DURATION = %i\n", getConfigValue(SIM_DURATION));
+    unloadConfig();
 
 
     //Richiesta di attivazione inibitore
@@ -100,9 +112,8 @@ int main()
     //Segnali
     setSignalAction(SIGINT, onActivateDeactivateInhibitor);
     setSignalAction(SIGALRM, onPrintStatistics);
+//    setSignalAction(SIGSEGV, checkError);
 
-    //Code di messaggi
-    masterMessageChannelId = getMessageId(masterPid);
 
     //Creazione semafori
     statisticsSemaphoreId = getSemaphore(STATISTICS_SEMAPHORE);
@@ -115,15 +126,19 @@ int main()
     unlockSemaphore(statisticsSemaphoreId);
 
     processes += createInhibitor() + 1;
-    //processes += createSupply() + 1;
+    processes += createSupply() + 1;
     processes += createActivator() + 1;
 
-    int initialAtoms = getConfigValue(N_ATOMI_INIT);
+    //Code di messaggi
+    masterMessageChannelId = getMessageId(masterPid);
+    supplyMessageChannelId = getMessageId(supplyPid);
+    activatorMessageChannelId = getMessageId(activatorPid);
+    inhibitorMessageChannelId = getMessageId(inhibitorPid);
+
     for (int i = 0; i < initialAtoms; i++)
     {
-        processes += createAtom() + 1;
+        createAtom();
     }
-
     listenMessages();
     return 0;
 }
@@ -136,7 +151,7 @@ void listenMessages()
         int result = msgrcv(masterMessageChannelId, &message, sizeof(message), 0, 0);
         if (result != -1)
         {
-            printf("[Master] Messaggio ricevuto: %s\n", message.messageText);
+        //    printf("[Master] Messaggio ricevuto: %s\n", message.messageText);
             if (message.messageType == 1)
             {
                 if (stringEquals(message.messageText, "SupplyReady"))
@@ -160,16 +175,16 @@ void listenMessages()
                     Atom readingAtom = atoms;
                     while (readingAtom != NULL)
                     {
-                        sendMessage(activatorPid, createMessage(2, stringJoin("AtomPid=", intToString(getNodeValue(readingAtom)))));
+                        sendMessage(activatorMessageChannelId, createMessage(2, stringJoin("AtomPid=", intToString(getNodeValue(readingAtom)))));
                         readingAtom = getNextNode(readingAtom);
                     }
-                    sendMessage(activatorPid, createMessage(1, "AtomEnd"));
+                    sendMessage(activatorMessageChannelId, createMessage(1, "AtomEnd"));
                 }
                 else if (stringEquals(message.messageText, "Meltdown"))
                 {
                     if (isInhibitorActive)
                     {
-                        sendMessage(inhibitorPid, createMessage(1, "Meltdown"));
+                        sendMessage(inhibitorMessageChannelId, createMessage(1, "Meltdown"));
                     }
                     else
                     {
@@ -180,7 +195,7 @@ void listenMessages()
                 {
                     if (isInhibitorActive)
                     {
-                        sendMessage(inhibitorPid, createMessage(1, "Explode"));
+                        sendMessage(inhibitorMessageChannelId, createMessage(1, "Explode"));
                     }
                     else
                     {
@@ -200,11 +215,7 @@ void listenMessages()
                 else if (stringEquals(key, "AtomDie"))
                 {
                     processes--;
-                    printf("\n\nPREREMOVE %i\n", atoi(value));
-                    printValues(atoms);
-                    removeNode(searchNodeValue(atoms, atoi(value)));
-                    printf("\n\npostremove\n");
-                    printValues(atoms);
+                    atoms = removeNode(searchNodeValue(atoms, atoi(value)));
                 }
                 free(key);
                 free(value);
@@ -217,38 +228,38 @@ void listenMessages()
                 char* valueS = stringAfter(text, "=");
                 if (stringEquals(key, "AtomSplit"))
                 {
-                    int atomPid = atoi(pidS);
+                    int atomMessageChannelId = getMessageId(atoi(pidS));
                     if (isInhibitorActive)
                     {
-                        sendMessage(inhibitorPid, createMessage(2, stringJoin("AtomSplit=", valueS)));
+                        sendMessage(inhibitorMessageChannelId, createMessage(2, stringJoin("AtomSplit=", valueS)));
                         message = createEmptyMessage();
                         result = msgrcv(masterMessageChannelId, &message, sizeof(message), 4, 0);
                         if (result != -1)
                         {
-                            sendMessage(atomPid, createMessage(4, message.messageText));
+                            sendMessage(atomMessageChannelId, createMessage(4, message.messageText));
                         }
                     }
                     else
                     {
-                        sendMessage(atomPid, createMessage(4, "1"));
+                        sendMessage(atomMessageChannelId, createMessage(4, "1"));
                     }
                 }
                 else if (stringEquals(key, "AtomEnergy"))
                 {
-                    int atomPid = atoi(pidS);
+                    int atomMessageChannelId = getMessageId(atoi(pidS));
                     if (isInhibitorActive)
                     {
-                        sendMessage(inhibitorPid, createMessage(2, stringJoin("AtomEnergy=", valueS)));
+                        sendMessage(inhibitorMessageChannelId, createMessage(2, stringJoin("AtomEnergy=", valueS)));
                         message = createEmptyMessage();
                         result = msgrcv(masterMessageChannelId, &message, sizeof(message), 2, 0);
                         if (result != -1)
                         {
-                            sendMessage(atomPid, createMessage(2, message.messageText));
+                            sendMessage(atomMessageChannelId, createMessage(2, message.messageText));
                         }
                     }
                     else
                     {
-                        sendMessage(atomPid, createMessage(2, stringJoin("AtomEnergy=", valueS)));
+                        sendMessage(atomMessageChannelId, createMessage(2, stringJoin("AtomEnergy=", valueS)));
                     }
                 }
                 free(pidS);
@@ -261,24 +272,108 @@ void listenMessages()
     }
 }
 
+void checkLastMessages()
+{
+    Message message = createEmptyMessage();
+    int result = msgrcv(masterMessageChannelId, &message, sizeof(message), 0, 0);
+    if (result != -1)
+    {
+    //    printf("[Master] Last message = %s\n", message.messageText);
+        if (message.messageType == 1)
+        {
+            if (stringEquals(message.messageText, "SupplyStop"))
+            {
+                isSupplyReady = false;
+                processes--;
+            }
+            else if (stringEquals(message.messageText, "ActivatorStop"))
+            {
+                isActivatorReady = false;
+                processes--;
+            }
+            else if (stringEquals(message.messageText, "InhibitorStop"))
+            {
+                isInhibitorReady = false;
+                processes--;
+            }
+            else if (stringEquals(message.messageText, "AtomList"))
+            {
+                sendMessage(activatorMessageChannelId, createMessage(1, "AtomEnd"));
+                sendMessage(activatorMessageChannelId, createMessage(1, "Stop"));
+            }
+        }
+        else if (message.messageType == 2)
+        {
+            char* key = stringBefore(message.messageText, "=");
+            char* value = stringAfter(message.messageText, "=");
+            if (stringEquals(key, "AtomCreate"))
+            {
+                sendMessage(getMessageId(atoi(value)), createMessage(1, "Stop"));
+            }
+            free(key);
+            free(value);
+        }
+    }
+    if (!checkStop())
+    {
+        checkLastMessages();
+    }
+}
+
+void checkStopAtomsMessages()
+{
+    Message message = createEmptyMessage();
+    int result = msgrcv(masterMessageChannelId, &message, sizeof(message), 0, 0);
+    if (result != -1)
+    {
+        printf("[Master] Atom stop message = %s     Remaining: %i\n", message.messageText, processes-1);
+        if (message.messageType == 2)
+        {
+            char* key = stringBefore(message.messageText, "=");
+            char* value = stringAfter(message.messageText, "=");
+            if (stringEquals(key, "AtomDie"))
+            {
+                processes--;
+                atoms = removeNode(searchNodeValue(atoms, atoi(value)));
+            }
+            free(key);
+            free(value);
+        }
+    }
+    if (processes != 0)
+    {
+        checkStopAtomsMessages();
+    }
+}
+
 void checkStart()
 {
     if (isSupplyReady && isActivatorReady && isInhibitorReady)
     {
-        sendMessage(supplyPid, createMessage(1, "Start"));
-        sendMessage(activatorPid, createMessage(1, "Start"));
-        sendMessage(inhibitorPid, createMessage(1, "Start"));
+        sendMessage(supplyMessageChannelId, createMessage(1, "Start"));
+        sendMessage(activatorMessageChannelId, createMessage(1, "Start"));
+        sendMessage(inhibitorMessageChannelId, createMessage(1, "Start"));
         alarm(1);
     }
 }
 
+boolean checkStop()
+{
+    if (!isSupplyReady && !isActivatorReady && !isInhibitorReady)
+    {
+        return true;
+    }
+    return false;
+}
+
 void onPrintStatistics(int sig)
 {
-    if (sig == SIGALRM)
+    if (sig == SIGALRM && !isTerminating)
     {
         //Ottenimento accesso alla memoria condivisa
         waitAndLockSemaphore(statisticsSemaphoreId);
         int* statistics = getSharedMemory(statisticsSharedMemoryId);
+        statistics[ENERGY_CONSUMED] += energyDemand;
 
         //Stampa dati riguardanti le operazioni relative all'ultimo secondo
         printf("\n\nOperazioni nell'ultimo secondo:\n");
@@ -294,10 +389,12 @@ void onPrintStatistics(int sig)
         printf("[Inibitore] Energia assorbita: %i\n", statistics[ABSORBED_ENERGY]);
 
         //Aggiunta alle statistiche totali delle statistiche dell'ultimo secondo
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 11; i++)
         {
             cumulativeStatistics[i] += statistics[i];
         }
+
+        cumulativeStatistics[ENERGY_AMOUNT] -= energyDemand;
 
         //Stampa dati riguardanti tutte le operazioni dall'avvio del programma
         printf("\n\nOperazioni dall'avvio del programma:\n");
@@ -305,6 +402,7 @@ void onPrintStatistics(int sig)
         printf("Numero di scissioni: %i\n", cumulativeStatistics[SPLIT_AMOUNT]);
         printf("Energia prodotta: %i\n", cumulativeStatistics[ENERGY_PRODUCED]);
         printf("Energia consumata: %i\n", cumulativeStatistics[ENERGY_CONSUMED]);
+        printf("Energia attuale: %i\n", cumulativeStatistics[ENERGY_AMOUNT]);
         printf("Atomi creati: %i\n", cumulativeStatistics[CREATED_ATOMS]);
         printf("Scorie: %i\n", cumulativeStatistics[DEAD_ATOMS]);
         printf("[Inibitore] Scissioni degli atomi rallentate: %i\n", cumulativeStatistics[DELAYED_ATOM_SPLIT]);
@@ -314,16 +412,12 @@ void onPrintStatistics(int sig)
 
         //Reset memoria condivisa, controllo e prelievo ENERGY_DEMAND
         clearSharedMemory(statisticsSharedMemoryId);
-        if (cumulativeStatistics[ENERGY_AMOUNT] >= energyDemand)
-        {
-            statistics[ENERGY_CONSUMED] += energyDemand;
-            cumulativeStatistics[ENERGY_AMOUNT] -= energyDemand;
-            statistics[ENERGY_AMOUNT] = cumulativeStatistics[ENERGY_AMOUNT];
-        }
-        else
+        if (cumulativeStatistics[ENERGY_AMOUNT] < 0)
         {
             terminate(BLACKOUT);
         }
+        statistics[ENERGY_AMOUNT] = cumulativeStatistics[ENERGY_AMOUNT];
+        cumulativeStatistics[ENERGY_AMOUNT] = 0;
         unlockSemaphore(statisticsSemaphoreId);
         remainingTime--;
         if (remainingTime > 0)
@@ -357,30 +451,30 @@ void terminate(TerminationType reason)
         printf("Spegnimento programma... (MELTDOWN)\n");
     }
 
-    processes -= 3;
-    sendMessage(supplyPid, createMessage(1, "Stop"));
-    sendMessage(activatorPid, createMessage(1, "Stop"));
-    sendMessage(inhibitorPid, createMessage(1, "Stop"));
+    sendMessage(supplyMessageChannelId, createMessage(1, "Stop"));
+    sendMessage(activatorMessageChannelId, createMessage(1, "Stop"));
+    sendMessage(inhibitorMessageChannelId, createMessage(1, "Stop"));
+
+    checkLastMessages();
 
     //Terminazione atomi
-    atoms = getFirstNode(atoms);
-    Atom readingAtom = atoms;
-    while (atoms != NULL)
+    Atom readingAtom = getFirstNode(atoms);
+    printf("STOPPING ATOMS %i\n", nodeSize(readingAtom));
+    printValues(readingAtom);
+    while (readingAtom != NULL)
     {
         int atomPid = readingAtom->value;
-        printf("[Master] Close atom %i\n", atomPid);
-        sendMessage(atomPid, createMessage(1, "Stop"));
+        sendMessage(getMessageId(atomPid), createMessage(1, "Stop"));
         readingAtom = getNextNode(readingAtom);
-        processes--;
     }
+    checkStopAtomsMessages();
 
     //Chiusura risorse IPC
-    printf("Rimozione schifezzuole\nProcessi rimasti accesi: %i\n", processes);
-    killMessageChannel(masterPid);
+    killMessageChannel(masterMessageChannelId);
+    detachFromSharedMemory(statisticsSharedMemoryId);
     deleteSharedMemory(statisticsSharedMemoryId);
     deleteSemaphore(statisticsSemaphoreId);
     deleteConfig();
-    sleep(5);
     exit(0);
 }
 

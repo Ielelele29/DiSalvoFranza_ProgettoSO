@@ -15,19 +15,23 @@ int stringLength(char* string)
 
 char* stringCut(char* string, int start, int end)
 {
-    char* newString = malloc(sizeof(char)*stringLength(string));
-    int i = 0;
-    int j = 0;
-    while (string[i] != '\0')
+    if (end > start || end < 0)
     {
-        if (i >= start && (i <= end || end < 0))
+        char* newString = emptyString((end < 0 ? stringLength(string) - start : end-start+1)+1);
+        int i = 0;
+        int j = 0;
+        while (string[i] != '\0')
         {
-            newString[j] = string[i];
-            j++;
+            if (i >= start && (i <= end || end < 0))
+            {
+                newString[j] = string[i];
+                j++;
+            }
+            i++;
         }
-        i++;
+        return newString;
     }
-    return newString;
+    return "";
 }
 
 char* string(char* string)
@@ -37,7 +41,12 @@ char* string(char* string)
 
 char* emptyString(unsigned long length)
 {
-    return malloc(sizeof(char)*length);
+    char* string = malloc(sizeof(char)*length);
+    for (int i = 0; i < length; i++)
+    {
+        string[i] = '\0';
+    }
+    return string;
 }
 
 char* stringClearChar(char* string, char c)
@@ -160,7 +169,7 @@ char* stringBefore(char* input, char* endReading)
 char* intToString(int num)
 {
     char* numString = emptyString(11);
-    sprintf(numString, "%d", num);
+    sprintf(numString, "%i", num);
     return numString;
 }
 

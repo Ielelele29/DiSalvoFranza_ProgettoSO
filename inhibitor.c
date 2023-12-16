@@ -21,6 +21,7 @@ int inhibitorPid = -1;
 int energyExplodeThreshold = -1;
 
 //Code di messaggi
+int masterMessageChannelId = -1;
 int inhibitorMessageChannelId = -1;
 
 //Memoria condivisa
@@ -33,18 +34,27 @@ int statisticsSemaphoreId = -1;
 void listenMessages();
 
 
+
+void checkError(int sig)
+{
+    printf("Inhibitor error\n\n\n");
+}
+
 int main() {
     //Segnali
     ignoreSignal(SIGINT);
+    setSignalAction(SIGSEGV, checkError);
 
     //Pid processi
     masterPid = getppid();
     inhibitorPid = getpid();
 
-    //Variabili
+    //Config
     energyExplodeThreshold = getConfigValue(ENERGY_EXPLODE_THRESHOLD);
+    unloadConfig();
 
     //Ricezione messaggi
+    masterMessageChannelId = getMessageId(masterPid);
     inhibitorMessageChannelId = getMessageId(inhibitorPid);
 
     //Semafori
@@ -53,10 +63,12 @@ int main() {
     //Memoria condivisa
     statisticsSharedMemoryId = getSharedMemoryId(STATISTICS_SHARED_MEMORY, sizeof(int)*11);
 
-    sendMessage(masterPid, createMessage(1, "InhibitorReady"));
+    sendMessage(masterMessageChannelId, createMessage(1, "InhibitorReady"));
     listenMessages();
 
-    killMessageChannel(inhibitorPid);
+    killMessageChannel(inhibitorMessageChannelId);
+    detachFromSharedMemory(statisticsSharedMemoryId);
+    sendMessage(masterMessageChannelId, createMessage(1, "InhibitorStop"));
     printf("END INHIBITOR\n");
     return 0;
 }
@@ -103,24 +115,24 @@ void listenMessages()
                 if (finalEnergy > energyExplodeThreshold) //Evitare esplosioni
                 {
                     statistics[AVOIDED_EXPLOSIONS]++;
-                    sendMessage(masterPid, createMessage(4, "0"));
+                    sendMessage(masterMessageChannelId, createMessage(4, "0"));
                 }
                 else //Rallentamento scissione atomi
                 {
                     if (getRandom() < 1-perc)
                     {
-                        sendMessage(masterPid, createMessage(4, "1"));
+                        sendMessage(masterMessageChannelId, createMessage(4, "1"));
                     }
                     else
                     {
                         statistics[DELAYED_ATOM_SPLIT]++;
-                        sendMessage(masterPid, createMessage(4, "0"));
+                        sendMessage(masterMessageChannelId, createMessage(4, "0"));
                     }
                 }
             }
             else if (stringEquals(key, "AtomEnergy"))
             {
-                sendMessage(masterPid, createMessage(2, stringJoin("AtomEnergy=", intToString(finalEnergy))));
+                sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomEnergy=", intToString(finalEnergy))));
             }
             unlockSemaphore(statisticsSemaphoreId);
 
