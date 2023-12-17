@@ -171,7 +171,7 @@ void listenMessages()
                 }
                 else if (stringEquals(message.messageText, "AtomList"))
                 {
-                    printf("[Master] Quantità atomi: %i\n", nodeSize(atoms));
+     //               printf("[Master] Quantità atomi: %i\n", nodeSize(atoms));
                     Atom readingAtom = atoms;
                     while (readingAtom != NULL)
                     {
@@ -231,6 +231,7 @@ void listenMessages()
                     int atomMessageChannelId = getMessageId(atoi(pidS));
                     if (isInhibitorActive)
                     {
+    //                    printf("%s Fase 2\n", pidS);
                         sendMessage(inhibitorMessageChannelId, createMessage(2, stringJoin("AtomSplit=", valueS)));
                         message = createEmptyMessage();
                         result = msgrcv(masterMessageChannelId, &message, sizeof(message), 4, 0);
@@ -251,7 +252,7 @@ void listenMessages()
                     {
                         sendMessage(inhibitorMessageChannelId, createMessage(2, stringJoin("AtomEnergy=", valueS)));
                         message = createEmptyMessage();
-                        result = msgrcv(masterMessageChannelId, &message, sizeof(message), 2, 0);
+                        result = msgrcv(masterMessageChannelId, &message, sizeof(message), 5, 0);
                         if (result != -1)
                         {
                             sendMessage(atomMessageChannelId, createMessage(2, message.messageText));
@@ -278,7 +279,7 @@ void checkLastMessages()
     int result = msgrcv(masterMessageChannelId, &message, sizeof(message), 0, 0);
     if (result != -1)
     {
-    //    printf("[Master] Last message = %s\n", message.messageText);
+ //       printf("[Master] Last message = %s\n", message.messageText);
         if (message.messageType == 1)
         {
             if (stringEquals(message.messageText, "SupplyStop"))
@@ -298,8 +299,7 @@ void checkLastMessages()
             }
             else if (stringEquals(message.messageText, "AtomList"))
             {
-                sendMessage(activatorMessageChannelId, createMessage(1, "AtomEnd"));
-                sendMessage(activatorMessageChannelId, createMessage(1, "Stop"));
+                sendSignal(activatorPid, SIGUSR1);
             }
         }
         else if (message.messageType == 2)
@@ -308,7 +308,12 @@ void checkLastMessages()
             char* value = stringAfter(message.messageText, "=");
             if (stringEquals(key, "AtomCreate"))
             {
-                sendMessage(getMessageId(atoi(value)), createMessage(1, "Stop"));
+                sendSignal(atoi(value), SIGUSR1);
+            }
+            else if (stringEquals(key, "AtomDie"))
+            {
+                processes--;
+                atoms = removeNode(searchNodeValue(atoms, atoi(value)));
             }
             free(key);
             free(value);
@@ -320,7 +325,7 @@ void checkLastMessages()
     }
 }
 
-void checkStopAtomsMessages()
+void checkStopAtomsMessages(int pid)
 {
     Message message = createEmptyMessage();
     int result = msgrcv(masterMessageChannelId, &message, sizeof(message), 0, 0);
@@ -329,21 +334,36 @@ void checkStopAtomsMessages()
         printf("[Master] Atom stop message = %s     Remaining: %i\n", message.messageText, processes-1);
         if (message.messageType == 2)
         {
+            boolean removed = false;
             char* key = stringBefore(message.messageText, "=");
             char* value = stringAfter(message.messageText, "=");
             if (stringEquals(key, "AtomDie"))
             {
-                processes--;
-                atoms = removeNode(searchNodeValue(atoms, atoi(value)));
+                int pidValue = atoi(value);
+                if (pidValue == pid)
+                {
+                    processes--;
+                    atoms = removeNode(searchNodeValue(atoms, atoi(value)));
+                    removed = true;
+                }
+            }
+            else if (stringEquals(key, "AtomCreate"))
+            {
+                sendSignal(atoi(value), SIGUSR1);
             }
             free(key);
             free(value);
+            if (removed)
+            {
+                return;
+            }
         }
-    }
+        checkStopAtomsMessages(pid);
+    }/*
     if (processes != 0)
     {
         checkStopAtomsMessages();
-    }
+    }*/
 }
 
 void checkStart()
@@ -450,11 +470,15 @@ void terminate(TerminationType reason)
     {
         printf("Spegnimento programma... (MELTDOWN)\n");
     }
-
+/*
     sendMessage(supplyMessageChannelId, createMessage(1, "Stop"));
     sendMessage(activatorMessageChannelId, createMessage(1, "Stop"));
-    sendMessage(inhibitorMessageChannelId, createMessage(1, "Stop"));
+    sendMessage(inhibitorMessageChannelId, createMessage(1, "Stop"));*/
 
+    sendSignal(supplyPid, SIGUSR1);
+    sendSignal(activatorPid, SIGUSR1);
+    sendSignal(inhibitorPid, SIGUSR1);
+    sleep(3);
     checkLastMessages();
 
     //Terminazione atomi
@@ -464,11 +488,16 @@ void terminate(TerminationType reason)
     while (readingAtom != NULL)
     {
         int atomPid = readingAtom->value;
-        sendMessage(getMessageId(atomPid), createMessage(1, "Stop"));
+        sendSignal(atomPid, SIGUSR1);
+    //    sendMessage(getMessageId(atomPid), createMessage(1, "Stop"));
         readingAtom = getNextNode(readingAtom);
+        checkStopAtomsMessages(atomPid);
     }
-    checkStopAtomsMessages();
-
+    Message message = createEmptyMessage();
+    while (msgrcv(masterMessageChannelId, &message, sizeof(message), 0, IPC_NOWAIT) != -1)
+    {
+        message = createEmptyMessage();
+    }
     //Chiusura risorse IPC
     killMessageChannel(masterMessageChannelId);
     detachFromSharedMemory(statisticsSharedMemoryId);

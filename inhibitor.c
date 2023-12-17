@@ -40,10 +40,23 @@ void checkError(int sig)
     printf("Inhibitor error\n\n\n");
 }
 
+void onTerminate(int sig)
+{
+    if (sig == SIGUSR1)
+    {
+        killMessageChannel(inhibitorMessageChannelId);
+        detachFromSharedMemory(statisticsSharedMemoryId);
+        sendMessage(masterMessageChannelId, createMessage(1, "InhibitorStop"));
+        printf("END INHIBITOR\n");
+        exit(0);
+    }
+}
+
 int main() {
     //Segnali
     ignoreSignal(SIGINT);
     setSignalAction(SIGSEGV, checkError);
+    setSignalAction(SIGUSR1, onTerminate);
 
     //Pid processi
     masterPid = getppid();
@@ -65,11 +78,6 @@ int main() {
 
     sendMessage(masterMessageChannelId, createMessage(1, "InhibitorReady"));
     listenMessages();
-
-    killMessageChannel(inhibitorMessageChannelId);
-    detachFromSharedMemory(statisticsSharedMemoryId);
-    sendMessage(masterMessageChannelId, createMessage(1, "InhibitorStop"));
-    printf("END INHIBITOR\n");
     return 0;
 }
 
@@ -81,22 +89,29 @@ void listenMessages()
     {
         if (message.messageType == 1) //Terminazione
         {
-            if (stringEquals(message.messageText, "Stop"))
+        /*    if (stringEquals(message.messageText, "Stop"))
             {
                 return;
             }
-            else if (stringEquals(message.messageText, "Explode"))
+            else */
+            if (stringEquals(message.messageText, "Explode"))
             {
                 waitAndLockSemaphore(statisticsSemaphoreId);
                 int* statistics = getSharedMemory(statisticsSharedMemoryId);
-                statistics[AVOIDED_EXPLOSIONS];
+                statistics[AVOIDED_EXPLOSIONS]++;
+                if (statistics[ENERGY_AMOUNT] > energyExplodeThreshold)
+                {
+                    int diff = statistics[ENERGY_AMOUNT] - energyExplodeThreshold;
+                    statistics[ABSORBED_ENERGY] += diff;
+                    statistics[ENERGY_AMOUNT] -= diff;
+                }
                 unlockSemaphore(statisticsSemaphoreId);
             }
             else if (stringEquals(message.messageText, "Meltdown"))
             {
                 waitAndLockSemaphore(statisticsSemaphoreId);
                 int* statistics = getSharedMemory(statisticsSharedMemoryId);
-                statistics[AVOIDED_MELTDOWNS];
+                statistics[AVOIDED_MELTDOWNS]++;
                 unlockSemaphore(statisticsSemaphoreId);
             }
         }
@@ -112,7 +127,7 @@ void listenMessages()
             int finalEnergy = (int)(energy*(1-(0.3*perc)));
             if (stringEquals(key, "AtomSplit"))
             {
-                if (finalEnergy > energyExplodeThreshold) //Evitare esplosioni
+                if (actualEnergy + finalEnergy > energyExplodeThreshold) //Evitare esplosioni
                 {
                     statistics[AVOIDED_EXPLOSIONS]++;
                     sendMessage(masterMessageChannelId, createMessage(4, "0"));
@@ -132,7 +147,7 @@ void listenMessages()
             }
             else if (stringEquals(key, "AtomEnergy"))
             {
-                sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomEnergy=", intToString(finalEnergy))));
+                sendMessage(masterMessageChannelId, createMessage(5, stringJoin("AtomEnergy=", intToString(finalEnergy))));
             }
             unlockSemaphore(statisticsSemaphoreId);
 

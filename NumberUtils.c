@@ -1,10 +1,7 @@
-//
-// Created by lelelele29 on 08/12/23.
-//
-
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <unistd.h>
 #include "NumberUtils.h"
 #include "CustomTypes.h"
 
@@ -13,7 +10,9 @@ double getRandom()
 {
     if (!isInitialized)
     {
-        srand(time(NULL));
+        int pid = getpid();
+        long seed = pid*pid + time(NULL);
+        srand(seed);
         isInitialized = true;
     }
     double random = rand()/(double)RAND_MAX;
@@ -45,22 +44,6 @@ double floor(double num)
         integerPart--;
     }
     return integerPart;
-}
-
-int getAtomFunction(int N_ATOMICO, int N_ATOM_MAX)
-{
-    if(N_ATOMICO <= N_ATOM_MAX*0.2)
-    {
-        return 0;
-    }
-    else if (N_ATOMICO <= N_ATOM_MAX*0.6) //N_ATOMICO > N_ATOM_MAX*0.2 (implicit)
-    {
-        return 1;
-    }
-    else
-    {
-        return 2;
-    }
 }
 
 int max(int num1, int num2)

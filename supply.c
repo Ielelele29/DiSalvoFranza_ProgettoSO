@@ -50,11 +50,24 @@ void checkError(int sig)
     printf("Supply error\n\n\n");
 }
 
+void onTerminate(int sig)
+{
+    if (sig == SIGUSR1)
+    {
+        killMessageChannel(supplyMessageChannelId);
+        detachFromSharedMemory(statisticsSharedMemoryId);
+        sendMessage(masterMessageChannelId, createMessage(1, "SupplyStop"));
+        printf("END SUPPLY\n");
+        exit(0);
+    }
+}
+
 int main()
 {
     //Segnali
     ignoreSignal(SIGINT);
     setSignalAction(SIGSEGV, checkError);
+    setSignalAction(SIGUSR1, onTerminate);
 
     //Pid processi
     masterPid = getppid();
@@ -81,10 +94,7 @@ int main()
     sendMessage(masterMessageChannelId, createMessage(1, "SupplyReady"));
     listenMessage();
 
-    killMessageChannel(supplyMessageChannelId);
-    detachFromSharedMemory(statisticsSharedMemoryId);
-    sendMessage(masterMessageChannelId, createMessage(1, "SupplyStop"));
-    printf("END SUPPLY\n");
+
     return 0;
 }
 
@@ -92,7 +102,7 @@ int main()
 
 void generateAtoms()
 {
-    if (checkMessage())
+ //   if (checkMessage())
     {
         for (int i = 0; i < atomsAmount; i++)
         {
@@ -147,7 +157,7 @@ void listenMessage()
     }
     listenMessage();
 }
-
+/*
 boolean checkMessage()
 {
     Message message = createEmptyMessage();
@@ -163,7 +173,7 @@ boolean checkMessage()
         }
     }
     return true;
-}
+}*/
 
 
 

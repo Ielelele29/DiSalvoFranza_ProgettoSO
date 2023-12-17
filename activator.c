@@ -32,7 +32,7 @@ int statisticsSemaphoreId = -1;
 
 int step = -1;
 
-boolean checkMessage();
+//boolean checkMessage();
 void listenMessage();
 void splitAtoms();
 void waitNano();
@@ -44,11 +44,24 @@ void checkError(int sig)
     printf("Activator error\n\n\n");
 }
 
+void onTerminate(int sig)
+{
+    if (sig == SIGUSR1)
+    {
+        killMessageChannel(activatorMessageChannelId);
+        detachFromSharedMemory(statisticsSharedMemoryId);
+        sendMessage(masterMessageChannelId, createMessage(1, "ActivatorStop"));
+        printf("END ACTIVATOR\n");
+        exit(0);
+    }
+}
+
 int main()
 {
     //Segnali
     ignoreSignal(SIGINT);
     setSignalAction(SIGSEGV, checkError);
+    setSignalAction(SIGUSR1, onTerminate);
 
     //Pid processi
     masterPid = getppid();
@@ -71,17 +84,14 @@ int main()
     sendMessage(masterMessageChannelId, createMessage(1, "ActivatorReady"));
     listenMessage();
 
-    killMessageChannel(activatorMessageChannelId);
-    detachFromSharedMemory(statisticsSharedMemoryId);
-    sendMessage(masterMessageChannelId, createMessage(1, "ActivatorStop"));
-    printf("END ACTIVATOR\n");
+
     return 0;
 }
 
 int i = 0;
 void splitAtoms()
 {
-    if (checkMessage())
+ //   if (checkMessage())
     {
         printf("START SPLIT ATOMS %i\n\n", masterMessageChannelId);
         Atom atoms = NULL;
@@ -92,7 +102,7 @@ void splitAtoms()
             int result = msgrcv(activatorMessageChannelId, &message, sizeof(message), 0, 0);
             if (result != -1)
             {
-                printf("Activator message = %s\n", message.messageText);
+     //           printf("Activator message = %s\n", message.messageText);
                 if (message.messageType == 1)
                 {
                     if (stringEquals(message.messageText, "AtomEnd"))
@@ -160,7 +170,7 @@ void listenMessage()
     }
     listenMessage();
 }
-
+/*
 boolean checkMessage()
 {
     Message message = createEmptyMessage();
@@ -176,7 +186,7 @@ boolean checkMessage()
         }
     }
     return true;
-}
+}*/
 
 
 

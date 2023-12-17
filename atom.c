@@ -48,10 +48,23 @@ void checkError(int sig)
     printf("Atom error\n\n\n");
 }
 
+void onTerminate(int sig)
+{
+    if (sig == SIGUSR1)
+    {
+        killMessageChannel(atomMessageChannelId);
+        detachFromSharedMemory(statisticsSharedMemoryId);
+        sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomDie=", intToString(atomPid))));
+        //   printf("END ATOM\n");
+        exit(0);
+    }
+}
+
 int main()
 {
     ignoreSignal(SIGINT);
     setSignalAction(SIGSEGV, checkError);
+    setSignalAction(SIGUSR1, onTerminate);
 
     char** env = environ;
     while (*env != NULL)
@@ -91,13 +104,13 @@ int main()
     statistics[CREATED_ATOMS]++;
     unlockSemaphore(statisticsSemaphoreId);
 
+ //   printf("[Atom %i] Send Create\n", atomPid);
     sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomCreate=", intToString(atomPid))));
     listenMessages();
 
     killMessageChannel(atomMessageChannelId);
     detachFromSharedMemory(statisticsSharedMemoryId);
     sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomDie=", intToString(atomPid))));
- //   printf("END ATOM\n");
     return 0;
 }
 
@@ -111,11 +124,12 @@ void listenMessages()
     //    printf("[Atom] Messaggio = %s\n", message.messageText);
         if (message.messageType == 1)
         {
-            if (stringEquals(message.messageText, "Stop"))
+        /*    if (stringEquals(message.messageText, "Stop"))
             {
                 return;
             }
-            else if (stringEquals(message.messageText, "Split"))
+            else*/
+            if (stringEquals(message.messageText, "Split"))
             {
                 if (split())
                 {
@@ -134,16 +148,17 @@ boolean split()
     {
         // effettuare scissione
         int childAtomicNumber = getRandomIntBetween(minAtomicNumber, atomicNumber-1);
-    //    printf("[Atom] Child atomic number = %i\n", childAtomicNumber);
+ //       printf("[Atom] Child atomic number = %i\n", childAtomicNumber);
         atomicNumber -= childAtomicNumber;
         int energy = getSplitEnergy(atomicNumber, childAtomicNumber);
+  //      printf("%i Fase 1\n", atomPid);
         sendMessage(masterMessageChannelId, createMessage(3, stringJoin(intToString(atomPid), stringJoin(";AtomSplit=", intToString(energy)))));
         Message message = createEmptyMessage();
         int result = msgrcv(atomMessageChannelId, &message, sizeof(message), 0, 0);
     //    printf("[Atom] %i message 1 = %s\n", getpid(), message.messageText);
         if (result != -1)
         {
-            if (message.messageType == 1)
+        /*    if (message.messageType == 1)
             {
                 if (stringEquals(message.messageText, "Stop"))
                 {
@@ -151,7 +166,8 @@ boolean split()
                     return true;
                 }
             }
-            else if (message.messageType == 4)
+            else */
+            if (message.messageType == 4)
             {
                 boolean canCreate = stringEquals(message.messageText, "1") ? true : false;
                 if (canCreate)
@@ -181,7 +197,7 @@ boolean split()
                 //    printf("[Atom] %i message 2 = %s\n", getpid(), message.messageText);
                     if (result != -1)
                     {
-                        if (message.messageType == 1)
+                    /*    if (message.messageType == 1)
                         {
                             if (stringEquals(message.messageText, "Stop"))
                             {
@@ -189,7 +205,8 @@ boolean split()
                                 return true;
                             }
                         }
-                        else if (message.messageType == 2)
+                        else */
+                        if (message.messageType == 2)
                         {
                             char* key = stringBefore(message.messageText, "=");
                             char* value = stringAfter(message.messageText, "=");
@@ -199,14 +216,13 @@ boolean split()
                             }
                         }
                     }
-                    printf("WAIT STATS ATOM\n");
+     //               printf("[Atom %i] Energia: %i --> %i\n", atomPid, energy, finalEnergy);
                     waitAndLockSemaphore(statisticsSemaphoreId);
-                    printf("GOT\n");
                     int* statistics = getSharedMemory(statisticsSharedMemoryId);
                     statistics[SPLIT_AMOUNT]++;
                     statistics[ABSORBED_ENERGY] += energy - finalEnergy;
                     statistics[ENERGY_AMOUNT] += finalEnergy;
-                    statistics[ENERGY_PRODUCED] += finalEnergy;
+                    statistics[ENERGY_PRODUCED] += energy;
                     if (statistics[ENERGY_AMOUNT] > energyExplodeThreshold)
                     {
                         sendMessage(masterMessageChannelId, createMessage(1, "Explode"));
@@ -216,7 +232,7 @@ boolean split()
                 }
             }
         }
-        return true;
+        return false;
     }
     else
     {

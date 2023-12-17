@@ -40,6 +40,7 @@ void sendMessage(int messageChannelId, Message message)
         if (msgsnd(messageChannelId, &message, sizeof(message), 0) == -1)
         {
             perror("Send message error");
+            printf("Messaggio perso = %s\n", message.messageText);
         }
     }
     else
