@@ -26,6 +26,7 @@ int masterMessageChannelId = -1;
 int supplyMessageChannelId = -1;
 int activatorMessageChannelId = -1;
 int inhibitorMessageChannelId = -1;
+int masterInhibitorMessageChannelId = -1;
 
 //Memoria condivisa
 int statisticsSharedMemoryId = -1;
@@ -134,6 +135,7 @@ int main()
     supplyMessageChannelId = getMessageId(supplyPid);
     activatorMessageChannelId = getMessageId(activatorPid);
     inhibitorMessageChannelId = getMessageId(inhibitorPid);
+    masterInhibitorMessageChannelId = getMessageId(MaxPid+1);
 
     for (int i = 0; i < initialAtoms; i++)
     {
@@ -150,16 +152,13 @@ int main()
 
 void listenMessages()
 {
-    printf("MEssage A %i\n", masterMessageChannelId);
     if (masterMessageChannelId != -1)
     {
-        printf("MEssage B\n");
         Message message = createEmptyMessage();
         int result = msgrcv(masterMessageChannelId, &message, sizeof(message), 0, 0);
-        printf("MEssage C %i\n", result);
         if (result != -1)
         {
-            printf("[Master] Messaggio ricevuto: %s\n", message.messageText);
+      //      printf("[Master] Messaggio ricevuto: %s\n", message.messageText);
             if (message.messageType == 1)
             {
                 if (stringEquals(message.messageText, "SupplyReady"))
@@ -192,7 +191,9 @@ void listenMessages()
                 {
                     if (isInhibitorActive)
                     {
+        //                printf("Sending\n");
                         sendMessage(inhibitorMessageChannelId, createMessage(1, "Meltdown"));
+         //               printf("Sended\n");
                     }
                     else
                     {
@@ -242,7 +243,9 @@ void listenMessages()
     //                    printf("%s Fase 2\n", pidS);
                         sendMessage(inhibitorMessageChannelId, createMessage(2, stringJoin("AtomSplit=", valueS)));
                         message = createEmptyMessage();
-                        result = msgrcv(masterMessageChannelId, &message, sizeof(message), 4, 0);
+           //             printf("WAIT MESSAGE\n");
+                        result = msgrcv(masterInhibitorMessageChannelId, &message, sizeof(message), 4, 0);
+          //              printf("%i MESSAGE = %s\n", result, message.messageText);
                         if (result != -1)
                         {
                             sendMessage(atomMessageChannelId, createMessage(4, message.messageText));
@@ -260,7 +263,7 @@ void listenMessages()
                     {
                         sendMessage(inhibitorMessageChannelId, createMessage(2, stringJoin("AtomEnergy=", valueS)));
                         message = createEmptyMessage();
-                        result = msgrcv(masterMessageChannelId, &message, sizeof(message), 5, 0);
+                        result = msgrcv(masterInhibitorMessageChannelId, &message, sizeof(message), 5, 0);
                         if (result != -1)
                         {
                             sendMessage(atomMessageChannelId, createMessage(2, message.messageText));
@@ -340,7 +343,25 @@ void checkStopAtomsMessages(int pid)
     if (result != -1)
     {
         printf("[Master] Atom stop message = %s     Remaining: %i\n", message.messageText, processes-1);
-        if (message.messageType == 2)
+        if (message.messageType == 1)
+        {
+            if (stringEquals(message.messageText, "SupplyStop"))
+            {
+                isSupplyReady = false;
+                processes--;
+            }
+            else if (stringEquals(message.messageText, "ActivatorStop"))
+            {
+                isActivatorReady = false;
+                processes--;
+            }
+            else if (stringEquals(message.messageText, "InhibitorStop"))
+            {
+                isInhibitorReady = false;
+                processes--;
+            }
+        }
+        else if (message.messageType == 2)
         {
             boolean removed = false;
             char* key = stringBefore(message.messageText, "=");
@@ -492,7 +513,7 @@ void terminate(TerminationType reason)
     //Terminazione atomi
     Atom readingAtom = getFirstNode(atoms);
     printf("STOPPING ATOMS %i\n", nodeSize(readingAtom));
-    printValues(readingAtom);
+ //   printValues(readingAtom);
     while (readingAtom != NULL)
     {
         int atomPid = readingAtom->value;
@@ -538,7 +559,14 @@ int createSupply()
     if (pid < 0) //Errore di creazione della fork
     {
    //     printf("Errore durante la creazione del processo Alimentazione\n");
-        terminate(MELTDOWN);
+        if (isInhibitorActive)
+        {
+            sendMessage(inhibitorMessageChannelId, createMessage(1, "Meltdown"));
+        }
+        else
+        {
+            terminate(MELTDOWN);
+        }
         return -1;
     }
     else if (pid == 0) //Processo Alimentazione
@@ -563,7 +591,14 @@ int createActivator()
     if (pid < 0) //Errore di creazione della fork
     {
    //     printf("Errore durante la creazione del processo Attivatore\n");
-        terminate(MELTDOWN);
+        if (isInhibitorActive)
+        {
+            sendMessage(inhibitorMessageChannelId, createMessage(1, "Meltdown"));
+        }
+        else
+        {
+            terminate(MELTDOWN);
+        }
         return -1;
     }
     else if (pid == 0) //Processo Attivatore
@@ -588,7 +623,14 @@ int createInhibitor()
     if (pid == -1) //Errore di creazione della fork
     {
    //     printf("Errore durante la creazione del processo Inibitore\n");
-        terminate(MELTDOWN);
+        if (isInhibitorActive)
+        {
+            sendMessage(inhibitorMessageChannelId, createMessage(1, "Meltdown"));
+        }
+        else
+        {
+            terminate(MELTDOWN);
+        }
         return -1;
     }
     else if (pid == 0) //Processo Inibitore
@@ -614,7 +656,14 @@ int createAtom()
     {
 //        printf("Errore durante la creazione del processo Atomo\n");
         printf("MELTDOWN %i\n", masterMessageChannelId);
-        terminate(MELTDOWN);
+        if (isInhibitorActive)
+        {
+            sendMessage(inhibitorMessageChannelId, createMessage(1, "Meltdown"));
+        }
+        else
+        {
+            terminate(MELTDOWN);
+        }
         return -1;
     }
     else if (atomPid == 0) //Processo Atomo
@@ -624,13 +673,17 @@ int createAtom()
         char* forkEnv[] = {
                 stringJoin("MasterPid=", intToString(masterPid)),
                 stringJoin("AtomicNumber=", intToString(atomicNumber)),
+                "AlreadyAdded",
                 NULL};
  //       printf("Processo Atomo creato correttamente\n");
         execve("./Atom", forkArgs, forkEnv);
         printf("Errore Processo Atomo\n");
+        removeNode(searchNodeValue(atoms, getpid()));
+        processes--;
         return -1;
     }
-
+    addNode(&atoms, atomPid);
+    processes++;
     return 0;
 }
 

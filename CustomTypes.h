@@ -16,10 +16,11 @@ typedef struct Node {
 
 typedef Node* Atom;
 
-#define maxMessageLength 100
+#define MaxPid 4194304
+#define MaxMessageLength 100
 typedef struct Message {
     long messageType;
-    char messageText[maxMessageLength];
+    char messageText[MaxMessageLength];
 } Message;
 
 #endif //DISALVOFRANZA_PROGETTOSO_CUSTOMTYPES_H

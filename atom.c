@@ -62,11 +62,11 @@ void onTerminate(int sig)
 
 int main()
 {
-    printf("A1\n");
     ignoreSignal(SIGINT);
     setSignalAction(SIGSEGV, checkError);
     setSignalAction(SIGUSR1, onTerminate);
 
+    boolean sendCreate = true;
     char** env = environ;
     while (*env != NULL)
     {
@@ -78,9 +78,12 @@ int main()
         {
             atomicNumber = atoi(stringAfter(*env,"="));
         }
+        else if (stringEquals(*env, "AlreadyAdded"))
+        {
+            sendCreate = false;
+        }
         env++;
     }
-    printf("A2\n");
 
     //Pid processi
     atomPid = getpid();
@@ -88,7 +91,6 @@ int main()
     //Code di messaggi
     masterMessageChannelId = getMessageId(masterPid);
     atomMessageChannelId = getMessageId(atomPid);
-    printf("A3\n");
 
     //Semafori
     statisticsSemaphoreId = getSemaphore(STATISTICS_SEMAPHORE);
@@ -100,7 +102,6 @@ int main()
     minAtomicNumber = getConfigValue(MIN_N_ATOMICO);
     energyExplodeThreshold = getConfigValue(ENERGY_EXPLODE_THRESHOLD);
     unloadConfig();
-    printf("A4\n");
 
     //Statistics
     waitAndLockSemaphore(statisticsSemaphoreId);
@@ -108,9 +109,11 @@ int main()
     statistics[CREATED_ATOMS]++;
     unlockSemaphore(statisticsSemaphoreId);
 
-    printf("A5\n");
  //   printf("[Atom %i] Send Create\n", atomPid);
-    sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomCreate=", intToString(atomPid))));
+    if (sendCreate)
+    {
+        sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomCreate=", intToString(atomPid))));
+    }
     listenMessages();
 
     killMessageChannel(atomMessageChannelId);

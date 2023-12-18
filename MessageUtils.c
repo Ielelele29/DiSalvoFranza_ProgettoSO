@@ -12,7 +12,7 @@ Message createMessage(long type, const char* string)
     Message message = createEmptyMessage();
     message.messageType = type;
     int i = 0;
-    while (i < 100 && string[i] != '\0')
+    while (i < MaxMessageLength && string[i] != '\0')
     {
         message.messageText[i] = string[i];
         i++;
@@ -25,7 +25,7 @@ Message createEmptyMessage()
     Message message;
     message.messageType = -1;
     int i = 0;
-    while (i < 100)
+    while (i < MaxMessageLength)
     {
         message.messageText[i] = '\0';
         i++;
@@ -35,22 +35,17 @@ Message createEmptyMessage()
 
 void sendMessage(int messageChannelId, Message message)
 {
-    printf("messageChannelId = %i\n", messageChannelId);
     if (messageChannelId != -1)
     {
-        printf("message = %s\n", message.messageText);
         if (msgsnd(messageChannelId, &message, sizeof(message), 0) == -1)
         {
             perror("Send message error");
-            printf("Messaggio perso = %s\n", message.messageText);
         }
-        printf("End1");
     }
     else
     {
         printf("Send message channel id error: %i\nMessage: %s\n", messageChannelId, message.messageText);
     }
-    printf("End2");
 }
 
 int getMessageId(pid_t targetPid)
