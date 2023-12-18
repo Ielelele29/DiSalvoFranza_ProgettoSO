@@ -137,21 +137,29 @@ int main()
 
     for (int i = 0; i < initialAtoms; i++)
     {
-        createAtom();
+        if (createAtom() == -1)
+        {
+            printf("BREKK\n");
+            break;
+        }
     }
+    printf("MEX\n");
     listenMessages();
     return 0;
 }
 
 void listenMessages()
 {
+    printf("MEssage A %i\n", masterMessageChannelId);
     if (masterMessageChannelId != -1)
     {
+        printf("MEssage B\n");
         Message message = createEmptyMessage();
         int result = msgrcv(masterMessageChannelId, &message, sizeof(message), 0, 0);
+        printf("MEssage C %i\n", result);
         if (result != -1)
         {
-        //    printf("[Master] Messaggio ricevuto: %s\n", message.messageText);
+            printf("[Master] Messaggio ricevuto: %s\n", message.messageText);
             if (message.messageType == 1)
             {
                 if (stringEquals(message.messageText, "SupplyReady"))
@@ -279,7 +287,7 @@ void checkLastMessages()
     int result = msgrcv(masterMessageChannelId, &message, sizeof(message), 0, 0);
     if (result != -1)
     {
- //       printf("[Master] Last message = %s\n", message.messageText);
+        printf("[Master] Last message = %s\n", message.messageText);
         if (message.messageType == 1)
         {
             if (stringEquals(message.messageText, "SupplyStop"))
@@ -529,7 +537,8 @@ int createSupply()
     pid_t pid = fork();
     if (pid < 0) //Errore di creazione della fork
     {
-        printf("Errore durante la creazione del processo Alimentazione\n");
+   //     printf("Errore durante la creazione del processo Alimentazione\n");
+        terminate(MELTDOWN);
         return -1;
     }
     else if (pid == 0) //Processo Alimentazione
@@ -553,7 +562,8 @@ int createActivator()
     pid_t pid = fork();
     if (pid < 0) //Errore di creazione della fork
     {
-        printf("Errore durante la creazione del processo Attivatore\n");
+   //     printf("Errore durante la creazione del processo Attivatore\n");
+        terminate(MELTDOWN);
         return -1;
     }
     else if (pid == 0) //Processo Attivatore
@@ -577,7 +587,8 @@ int createInhibitor()
     pid_t pid = fork();
     if (pid == -1) //Errore di creazione della fork
     {
-        printf("Errore durante la creazione del processo Inibitore\n");
+   //     printf("Errore durante la creazione del processo Inibitore\n");
+        terminate(MELTDOWN);
         return -1;
     }
     else if (pid == 0) //Processo Inibitore
@@ -597,11 +608,13 @@ int createInhibitor()
 
 int createAtom()
 {
-    printf("Creazione processo Atomo...\n");
+ //   printf("Creazione processo Atomo...\n");
     pid_t atomPid = fork();
     if (atomPid == -1) //Errore di creazione della fork
     {
-        printf("Errore durante la creazione del processo Atomo\n");
+//        printf("Errore durante la creazione del processo Atomo\n");
+        printf("MELTDOWN %i\n", masterMessageChannelId);
+        terminate(MELTDOWN);
         return -1;
     }
     else if (atomPid == 0) //Processo Atomo
@@ -612,11 +625,12 @@ int createAtom()
                 stringJoin("MasterPid=", intToString(masterPid)),
                 stringJoin("AtomicNumber=", intToString(atomicNumber)),
                 NULL};
-        printf("Processo Atomo creato correttamente\n");
+ //       printf("Processo Atomo creato correttamente\n");
         execve("./Atom", forkArgs, forkEnv);
         printf("Errore Processo Atomo\n");
         return -1;
     }
+
     return 0;
 }
 

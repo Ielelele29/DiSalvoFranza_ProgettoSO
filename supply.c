@@ -122,8 +122,9 @@ void createAtom()
     pid_t atomPid = fork();
     if (atomPid == -1)
     {
-        printf("Errore durante la creazione del processo Atomo\n");
+    //    printf("Errore durante la creazione del processo Atomo\n");
         sendMessage(masterMessageChannelId, createMessage(1, "Meltdown"));
+        return;
     }
     else if (atomPid == 0)
     {

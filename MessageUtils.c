@@ -35,18 +35,22 @@ Message createEmptyMessage()
 
 void sendMessage(int messageChannelId, Message message)
 {
+    printf("messageChannelId = %i\n", messageChannelId);
     if (messageChannelId != -1)
     {
+        printf("message = %s\n", message.messageText);
         if (msgsnd(messageChannelId, &message, sizeof(message), 0) == -1)
         {
             perror("Send message error");
             printf("Messaggio perso = %s\n", message.messageText);
         }
+        printf("End1");
     }
     else
     {
         printf("Send message channel id error: %i\nMessage: %s\n", messageChannelId, message.messageText);
     }
+    printf("End2");
 }
 
 int getMessageId(pid_t targetPid)
