@@ -34,13 +34,6 @@ int statisticsSemaphoreId = -1;
 
 void listenMessages();
 
-
-
-void checkError(int sig)
-{
-    printf("Inhibitor error\n\n\n");
-}
-
 void onTerminate(int sig)
 {
     if (sig == SIGUSR1)
@@ -49,7 +42,6 @@ void onTerminate(int sig)
         killMessageChannel(masterInhibitorMessageChannelId);
         detachFromSharedMemory(statisticsSharedMemoryId);
         sendMessage(masterMessageChannelId, createMessage(1, "InhibitorStop"));
-        printf("END INHIBITOR\n");
         exit(0);
     }
 }
@@ -57,7 +49,6 @@ void onTerminate(int sig)
 int main() {
     //Segnali
     ignoreSignal(SIGINT);
-    setSignalAction(SIGSEGV, checkError);
     setSignalAction(SIGUSR1, onTerminate);
 
     //Pid processi
@@ -92,11 +83,6 @@ void listenMessages()
     {
         if (message.messageType == 1) //Terminazione
         {
-        /*    if (stringEquals(message.messageText, "Stop"))
-            {
-                return;
-            }
-            else */
             if (stringEquals(message.messageText, "Explode"))
             {
                 waitAndLockSemaphore(statisticsSemaphoreId);
@@ -124,7 +110,6 @@ void listenMessages()
             char* valueS = stringAfter(message.messageText, "=");
             int energy = atoi(valueS);
             boolean isLocked = true;
-     //       printf("Lock stats\n");
             waitAndLockSemaphore(statisticsSemaphoreId);
             int* statistics = getSharedMemory(statisticsSharedMemoryId);
             int actualEnergy = statistics[ENERGY_AMOUNT];
@@ -137,90 +122,33 @@ void listenMessages()
                     statistics[AVOIDED_EXPLOSIONS]++;
                     unlockSemaphore(statisticsSemaphoreId);
                     isLocked = false;
-     //               printf("ini start send mex 1\n");
                     sendMessage(masterInhibitorMessageChannelId, createMessage(4, "0"));
-    //                printf("ini end send mex 1\n");
                 }
                 else //Rallentamento scissione atomi
                 {
                     if (getRandom() < 1-perc)
                     {
-     //                   printf("ini send mex 2\n");
                         sendMessage(masterInhibitorMessageChannelId, createMessage(4, "1"));
-      //                  printf("ini end send mex 2\n");
                     }
                     else
                     {
                         statistics[DELAYED_ATOM_SPLIT]++;
                         unlockSemaphore(statisticsSemaphoreId);
                         isLocked = false;
-      //                  printf("ini send mex 3\n");
                         sendMessage(masterInhibitorMessageChannelId, createMessage(4, "0"));
-     //                   printf("ini end send mex 3\n");
                     }
                 }
             }
             else if (stringEquals(key, "AtomEnergy"))
             {
-   //             printf("ini send mex 4\n");
                 sendMessage(masterInhibitorMessageChannelId, createMessage(5, stringJoin("AtomEnergy=", intToString(finalEnergy))));
-     //           printf("ini end send mex 4\n");
             }
             if (isLocked)
             {
                 unlockSemaphore(statisticsSemaphoreId);
             }
-            /*
-            char* pidS = stringBefore(message.messageText, ";");
-            int pid = atoi(pidS);
-            if (isActive())
-            {
-                char* text = stringAfter(message.messageText, ";");
-                char* key = stringBefore(text, "=");
-                char* value = stringAfter(text, "=");
-                if (stringEquals(key, "SPLIT_ENERGY_PRODUCED"))
-                {
-                    int energy = atoi(value);
-                    waitAndLockSemaphore(statisticsSemaphore);
-                    int* memory = getSharedMemory(statisticsSharedMemoryId);
-                    int energyAmount = memory[ENERGY_AMOUNT];
-                    if (energyAmount + energy > ENERGY_EXPLODE_THRESHOLD) //Evitare esplosioni
-                    {
-                        memory[AVOIDED_EXPLOSIONS]++;
-                        sendMessage(pid, createMessage(2, "0"));
-                    }
-                    else //Rallentamento scissione atomi
-                    {
-                        double perc = energyAmount/(double)ENERGY_EXPLODE_THRESHOLD;
-                        if (getRandom() < 1-perc)
-                        {
-                            sendMessage(pid, createMessage(2, "1"));
-                        }
-                        else
-                        {
-                            memory[DELAYED_ATOM_SPLIT]++;
-                            sendMessage(pid, createMessage(2, "0"));
-                        }
-                    }
-                    unlockSemaphore(statisticsSemaphore);
-                }
-                else if (stringEquals(key, "MELTDOWN")) //Evitare meltdown
-                {
-                    sendMessage(pid, createMessage(2, "0"));
-                    waitAndLockSemaphore(statisticsSemaphore);
-                    int* memory = getSharedMemory(statisticsSharedMemoryId);
-                    memory[AVOIDED_MELTDOWNS]++;
-                    unlockSemaphore(statisticsSemaphore);
-                }
-                free(text);
-                free(key);
-                free(value);
-            }
-            else
-            {
-                sendMessage(pid, createMessage(2, "1"));
-            }
-            free(pidS);*/
+            free(key);
+            free(valueS);
         }
     }
     listenMessages();

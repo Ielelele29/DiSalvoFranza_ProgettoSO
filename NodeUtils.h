@@ -6,8 +6,6 @@ Node* createNode(int value);
 
 void addNode(Node** parent, int value);
 
-void addNodeAfter(Node* parent, int value);
-
 Node* removeNode(Node* node);
 
 Node* getFirstNode(Node* node);
@@ -27,9 +25,5 @@ boolean hasPreviousNode(Node* node);
 Node* getPreviousNode(Node* node);
 
 Node* searchNodeValue(Node* node, int value);
-
-int nodeSize(Node* node);
-
-void printValues(Node* node);
 
 #endif //DISALVOFRANZA_PROGETTOSO_NODEUTILS_H

@@ -37,21 +37,6 @@ void addNode(Node** parentP, int value)
     }
 }
 
-void addNodeAfter(Node* parent, int value)
-{
-    if (parent != NULL)
-    {
-        Node* child = createNode(value);
-        if (parent->nextNode != NULL)
-        {
-            child->nextNode = parent->nextNode;
-            parent->nextNode->previousNode = child;
-        }
-        child->previousNode = parent;
-        parent->nextNode = child;
-    }
-}
-
 Node* removeNode(Node* node)
 {
     if (node != NULL)
@@ -186,46 +171,4 @@ Node* searchNodeValue(Node* node, int value)
         }
     }
     return NULL;
-}
-
-int nodeSize(Node* node)
-{
-    if (node != NULL)
-    {
-        printf("A\n");
-        node = getFirstNode(node);
-        printf("B\n");
-        Node* nextNode = node;
-        int i = 0;
-        while (nextNode != NULL)
-        {
-            nextNode = getNextNode(nextNode);
-            if (nextNode == node)
-            {
-                break;
-            }
-            i++;
-        }
-        printf("C\n");
-        return i;
-    }
-    return 0;
-}
-
-void printValues(Node* node)
-{
-    if (node != NULL)
-    {
-        node = getFirstNode(node);
-        Node* nextNode = node;
-        while (nextNode != NULL)
-        {
-            printf("Node value = %i\n", getNodeValue(nextNode));
-            nextNode = getNextNode(nextNode);
-            if (nextNode == node)
-            {
-                break;
-            }
-        }
-    }
 }
