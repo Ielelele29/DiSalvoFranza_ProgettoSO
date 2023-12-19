@@ -40,6 +40,10 @@ void onTerminate(int sig)
 {
     if (sig == SIGUSR1)
     {
+        if (isLockedByThisProcess(statisticsSemaphoreId))
+        {
+            unlockSemaphore(statisticsSemaphoreId);
+        }
         killMessageChannel(activatorMessageChannelId);
         detachFromSharedMemory(statisticsSharedMemoryId);
         sendMessage(masterMessageChannelId, createMessage(1, "ActivatorStop"));
@@ -117,7 +121,7 @@ int i = 0;
 void splitAtoms(int j)
 {
     int k = 0;
-    while (atoms != NULL && k < 100)
+    while (atoms != NULL && k < 50)
     {
         if ((i+j)%3 == 0)
         {
@@ -126,10 +130,10 @@ void splitAtoms(int j)
             int* statistics = getSharedMemory(statisticsSharedMemoryId);
             statistics[ACTIVATION_AMOUNT]++;
             unlockSemaphore(statisticsSemaphoreId);
+            k++;
         }
         atoms = getNextNode(atoms);
         j++;
-        k++;
     }
     i++;
     waitNano();

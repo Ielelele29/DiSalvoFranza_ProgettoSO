@@ -38,6 +38,10 @@ void onTerminate(int sig)
 {
     if (sig == SIGUSR1)
     {
+        if (isLockedByThisProcess(statisticsSemaphoreId))
+        {
+            unlockSemaphore(statisticsSemaphoreId);
+        }
         killMessageChannel(inhibitorMessageChannelId);
         killMessageChannel(masterInhibitorMessageChannelId);
         detachFromSharedMemory(statisticsSharedMemoryId);

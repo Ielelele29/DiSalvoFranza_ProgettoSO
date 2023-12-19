@@ -26,4 +26,6 @@ Node* getPreviousNode(Node* node);
 
 Node* searchNodeValue(Node* node, int value);
 
+void printValues(Node* node);
+
 #endif //DISALVOFRANZA_PROGETTOSO_NODEUTILS_H

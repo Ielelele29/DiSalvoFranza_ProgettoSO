@@ -42,6 +42,10 @@ void onTerminate(int sig)
 {
     if (sig == SIGUSR1)
     {
+        if (isLockedByThisProcess(statisticsSemaphoreId))
+        {
+            unlockSemaphore(statisticsSemaphoreId);
+        }
         killMessageChannel(supplyMessageChannelId);
         detachFromSharedMemory(statisticsSharedMemoryId);
         sendMessage(masterMessageChannelId, createMessage(1, "SupplyStop"));

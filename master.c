@@ -295,14 +295,19 @@ void checkLastMessages()
         {
             char* key = stringBefore(message.messageText, "=");
             char* value = stringAfter(message.messageText, "=");
+            int pidValue = atoi(value);
             if (stringEquals(key, "AtomCreate"))
             {
-                sendSignal(atoi(value), SIGUSR1);
+                sendSignal(pidValue, SIGUSR1);
             }
             else if (stringEquals(key, "AtomDie"))
             {
                 processes--;
-                atoms = removeNode(searchNodeValue(atoms, atoi(value)));
+                Atom toRemove = searchNodeValue(atoms, pidValue);
+                if (toRemove != NULL)
+                {
+                    atoms = removeNode(toRemove);
+                }
             }
             free(key);
             free(value);
@@ -343,19 +348,23 @@ void checkStopAtomsMessages(int pid)
             boolean removed = false;
             char* key = stringBefore(message.messageText, "=");
             char* value = stringAfter(message.messageText, "=");
+            int pidValue = atoi(value);
             if (stringEquals(key, "AtomDie"))
             {
-                int pidValue = atoi(value);
+                processes--;
+                Atom toRemove = searchNodeValue(atoms, pidValue);
+                if (toRemove != NULL)
+                {
+                    atoms = removeNode(toRemove);
+                }
                 if (pidValue == pid)
                 {
-                    processes--;
-                    atoms = removeNode(searchNodeValue(atoms, atoi(value)));
                     removed = true;
                 }
             }
             else if (stringEquals(key, "AtomCreate"))
             {
-                sendSignal(atoi(value), SIGUSR1);
+                sendSignal(pidValue, SIGUSR1);
             }
             free(key);
             free(value);
@@ -456,6 +465,7 @@ void onPrintStatistics(int sig)
 void terminate(TerminationType reason)
 {
     isTerminating = true;
+    ignoreSignal(SIGALRM);
     if (reason == TIMEOUT)
     {
         printf("Spegnimento programma... (TIMEOUT)\n");
@@ -476,22 +486,22 @@ void terminate(TerminationType reason)
     sendSignal(supplyPid, SIGUSR1);
     sendSignal(activatorPid, SIGUSR1);
     sendSignal(inhibitorPid, SIGUSR1);
-    sleep(3);
+    unlockSemaphore(statisticsSemaphoreId);
     checkLastMessages();
 
     //Terminazione atomi
-    Atom readingAtom = getFirstNode(atoms);
-    while (readingAtom != NULL)
+    atoms = getFirstNode(atoms);
+    Atom lastAtom;
+    while (atoms != NULL)
     {
-        int atomPid = readingAtom->value;
+        lastAtom = atoms;
+        int atomPid = atoms->value;
         sendSignal(atomPid, SIGUSR1);
-        readingAtom = getNextNode(readingAtom);
         checkStopAtomsMessages(atomPid);
-    }
-    Message message = createEmptyMessage();
-    while (msgrcv(masterMessageChannelId, &message, sizeof(message), 0, IPC_NOWAIT) != -1)
-    {
-        message = createEmptyMessage();
+        if (atoms == lastAtom)
+        {
+            atoms = getNextNode(atoms);
+        }
     }
 
     //Chiusura risorse IPC
@@ -579,7 +589,6 @@ int createActivator()
 
 int createInhibitor()
 {
-    printf("Creazione processo Inibitore...\n");
     pid_t pid = fork();
     if (pid == -1) //Errore di creazione della fork
     {

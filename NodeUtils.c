@@ -172,3 +172,13 @@ Node* searchNodeValue(Node* node, int value)
     }
     return NULL;
 }
+
+void printValues(Node* node)
+{
+    node = getFirstNode(node);
+    while (node != NULL)
+    {
+        printf("Valore nodo = %i\n", node->value);
+        node = getNextNode(node);
+    }
+}

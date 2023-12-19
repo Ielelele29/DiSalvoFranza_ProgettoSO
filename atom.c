@@ -41,6 +41,10 @@ void onTerminate(int sig)
 {
     if (sig == SIGUSR1)
     {
+        if (isLockedByThisProcess(statisticsSemaphoreId))
+        {
+            unlockSemaphore(statisticsSemaphoreId);
+        }
         killMessageChannel(atomMessageChannelId);
         detachFromSharedMemory(statisticsSharedMemoryId);
         sendMessage(masterMessageChannelId, createMessage(2, stringJoin("AtomDie=", intToString(atomPid))));
@@ -185,11 +189,12 @@ boolean split()
                     statistics[ABSORBED_ENERGY] += energy - finalEnergy;
                     statistics[ENERGY_AMOUNT] += finalEnergy;
                     statistics[ENERGY_PRODUCED] += energy;
-                    if (statistics[ENERGY_AMOUNT] > energyExplodeThreshold)
+                    boolean explode = statistics[ENERGY_AMOUNT] > energyExplodeThreshold;
+                    unlockSemaphore(statisticsSemaphoreId);
+                    if (explode)
                     {
                         sendMessage(masterMessageChannelId, createMessage(1, "Explode"));
                     }
-                    unlockSemaphore(statisticsSemaphoreId);
                     return false;
                 }
             }

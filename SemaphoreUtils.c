@@ -1,7 +1,11 @@
 #include "SemaphoreUtils.h"
 #include "KeyUtils.h"
+#include "CustomTypes.h"
+#include "NodeUtils.h"
 #include <stdio.h>
 #include <sys/sem.h>
+
+Node* semaphores = NULL;
 
 int getSemaphore(int id)
 {
@@ -21,6 +25,11 @@ void deleteSemaphore(int semaphoreId)
         if (semctl(semaphoreId, 0, IPC_RMID) == -1)
         {
             perror("Delete semaphore error");
+        }
+        Node* sem = searchNodeValue(semaphores, semaphoreId);
+        if (sem != NULL)
+        {
+            semaphores = removeNode(semaphores);
         }
     }
 }
@@ -56,6 +65,11 @@ int waitAndLockSemaphore(int semaphoreId)
         {
             perror("Wait and lock semaphore error");
         }
+        Node* semNode = searchNodeValue(semaphores, semaphoreId);
+        if (semNode == NULL)
+        {
+            addNode(&semaphores, semaphoreId);
+        }
         return sem;
     }
     return -1;
@@ -74,7 +88,17 @@ int unlockSemaphore(int semaphoreId)
         {
             perror("Unlock semaphore error");
         }
+        Node* semNode = searchNodeValue(semaphores, semaphoreId);
+        if (semNode != NULL)
+        {
+            semaphores = removeNode(semaphores);
+        }
         return sem;
     }
     return -1;
+}
+
+boolean isLockedByThisProcess(int semaphoreId)
+{
+    return searchNodeValue(semaphores, semaphoreId) != NULL;
 }
