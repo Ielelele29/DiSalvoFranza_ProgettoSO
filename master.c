@@ -85,17 +85,19 @@ int main()
 
     //Richiesta di attivazione inibitore
     char input[1];
-    while (isInhibitorActive != 0 && isInhibitorActive != 1)
+    int i = -1;
+    while (i != 0 && i != 1)
     {
         printf("Inserisci 1 per attivare l'inibitore, e 0 per disattivarlo. In futuro potrai attivarlo e disattivarlo con Ctrl+c.\n");
         scanf("%s", input);
         //    fgets(input, sizeof(input), stdin);
-        sscanf(input, "%i", &isInhibitorActive);
-        if (isInhibitorActive != 0 && isInhibitorActive != 1)
+        sscanf(input, "%i", &i);
+        if (i != 0 && i != 1)
         {
             printf("Non hai inserito un numero valido\n");
         }
     }
+    isInhibitorActive = i == 1 ? true : false;
 
     //Pid processi
     masterPid = getpid();

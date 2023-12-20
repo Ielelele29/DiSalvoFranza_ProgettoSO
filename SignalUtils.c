@@ -18,7 +18,6 @@ void sendSignal(int pid, int signal)
     if (kill(pid, signal) != 0)
     {
         perror("Errore nell'invio del segnale");
-        printf("Pid = %s\n", pid);
     }
 }
 
