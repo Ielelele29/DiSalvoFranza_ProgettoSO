@@ -224,11 +224,12 @@ void listenMessages()
                     {
                         sendMessage(inhibitorMessageChannelId, createMessage(2, stringJoin("AtomSplit=", valueS)));
                         message = createEmptyMessage();
-                        result = msgrcv(masterInhibitorMessageChannelId, &message, sizeof(message), 4, 0);
-                        if (result != -1)
+                        result = -1;
+                        while (result == -1)
                         {
-                            sendMessage(atomMessageChannelId, createMessage(4, message.messageText));
+                            result = msgrcv(masterInhibitorMessageChannelId, &message, sizeof(message), 4, 0);
                         }
+                        sendMessage(atomMessageChannelId, createMessage(4, message.messageText));
                     }
                     else
                     {
@@ -242,11 +243,12 @@ void listenMessages()
                     {
                         sendMessage(inhibitorMessageChannelId, createMessage(2, stringJoin("AtomEnergy=", valueS)));
                         message = createEmptyMessage();
-                        result = msgrcv(masterInhibitorMessageChannelId, &message, sizeof(message), 5, 0);
-                        if (result != -1)
+                        result = -1;
+                        while (result == -1)
                         {
-                            sendMessage(atomMessageChannelId, createMessage(2, message.messageText));
+                            result = msgrcv(masterInhibitorMessageChannelId, &message, sizeof(message), 5, 0);
                         }
+                        sendMessage(atomMessageChannelId, createMessage(2, message.messageText));
                     }
                     else
                     {
